@@ -1,8 +1,7 @@
-use std::env;
+use std::{env, thread};
 use std::net::UdpSocket;
 
-use evdev::Key;
-
+use evdev::Device;
 use rust_virtual_kvm::net::send_event;
 use rust_virtual_kvm::temp::pick_device;
 
@@ -10,20 +9,29 @@ fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let (server_addr, client_addr) = parse_args(&args);
 
-    let mut device = pick_device();
-    // check if the device has an ENTER key
-    if device
-        .supported_keys()
-        .map_or(false, |keys| keys.contains(Key::KEY_ENTER))
-    {
-        println!("Supports ENTER");
-    } else {
-        println!("No ENTER");
-    }
+    println!("Pick a keyboard");
+    let mut keyboard = pick_device();
+    println!("Pick a mouse");
+    let mut mouse = pick_device();
 
     let socket = UdpSocket::bind(server_addr).expect("Could not bind socket");
     socket.connect(client_addr).expect("Could not connect to socket");
 
+    let cloned_socket = socket.try_clone().unwrap();
+    let keyboard_thread = thread::spawn(move || {thread_loop(&mut keyboard, &cloned_socket)});
+
+    let cloned_socket = socket.try_clone().unwrap();
+    let mouse_thread = thread::spawn(move || {thread_loop(&mut mouse, &cloned_socket)});
+
+    // TODO: why join when they both loop infinietly
+    keyboard_thread.join().expect("Keyboard thread panicked");
+    mouse_thread.join().expect("Mouse thread panicked");
+
+    Ok(())
+}
+
+fn thread_loop(device: &mut Device, socket: &UdpSocket) {
+    device.grab().expect("Could not grab device: {device:?}");
     loop {
         for ev in device.fetch_events().unwrap() {
             println!("{ev:?}");
