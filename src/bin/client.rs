@@ -1,9 +1,12 @@
-use std::{io::Result, net::UdpSocket, thread::sleep, time::Duration};
+use std::{env, io::Result, net::UdpSocket};
 use evdev::EventType;
 use rust_virtual_kvm::{dev::make_virtual_devices, net::recv_event};
 
 fn main() -> Result<()> {
-    let socket = UdpSocket::bind("127.0.0.1:8888").expect("Couldn't bind to address");
+    let args: Vec<String> = env::args().collect();
+    let server_addr = parse_args(&args);
+
+    let socket = UdpSocket::bind(server_addr).expect("Couldn't bind to address");
 
     let (mut keyboard, mut mouse) = make_virtual_devices()?;
 
@@ -13,7 +16,6 @@ fn main() -> Result<()> {
                 EventType::KEY => {
                     println!("Emitting: {event:?}");
                     keyboard.emit(&[event]).unwrap();
-                    sleep(Duration::from_millis(500));
                 }
                 EventType::RELATIVE => {
                     println!("Emitting: {event:?}");
@@ -28,4 +30,12 @@ fn main() -> Result<()> {
             println!("Error in received event");
         }
     }
+}
+
+fn parse_args(args: &[String]) -> &str {
+    if args.len() < 2 {
+        panic!("Not enough arguments");
+    }
+
+    &args[1]
 }

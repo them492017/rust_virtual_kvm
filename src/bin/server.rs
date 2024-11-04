@@ -1,3 +1,4 @@
+use std::env;
 use std::net::UdpSocket;
 
 use evdev::Key;
@@ -6,6 +7,9 @@ use rust_virtual_kvm::net::send_event;
 use rust_virtual_kvm::temp::pick_device;
 
 fn main() -> std::io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let (server_addr, client_addr) = parse_args(&args);
+
     let mut device = pick_device();
     // check if the device has an ENTER key
     if device
@@ -17,8 +21,8 @@ fn main() -> std::io::Result<()> {
         println!("No ENTER");
     }
 
-    let socket = UdpSocket::bind("127.0.0.1:8000").expect("Could not bind socket");
-    socket.connect("127.0.0.1:8888").expect("Could not connect to socket");
+    let socket = UdpSocket::bind(server_addr).expect("Could not bind socket");
+    socket.connect(client_addr).expect("Could not connect to socket");
 
     loop {
         for ev in device.fetch_events().unwrap() {
@@ -28,4 +32,12 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
+}
+
+fn parse_args(args: &[String]) -> (&str, &str) {
+    if args.len() < 3 {
+        panic!("Not enough arguments");
+    }
+
+    (&args[1], &args[2])
 }

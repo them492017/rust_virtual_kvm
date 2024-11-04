@@ -48,7 +48,7 @@
             mkdir -p $out/bin
             cp ${rustVirtualKvm}/bin/server $out/bin/server
           '';
-          default = packages.server;
+          default = packages.client;
         };
 
         devShells = {
