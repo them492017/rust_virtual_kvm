@@ -1,6 +1,7 @@
 pub mod net;
 pub mod temp;
 pub mod dev;
+pub mod state;
 
 use evdev::{EventType, InputEvent};
 use serde::{Deserialize, Serialize};
