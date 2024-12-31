@@ -1,11 +1,12 @@
 pub mod net;
-pub mod temp;
 pub mod dev;
 pub mod state;
+pub mod event;
 
 use evdev::{EventType, InputEvent};
 use serde::{Deserialize, Serialize};
 
+// TODO: make the event type more general for multiplatform support
 #[derive(Serialize, Deserialize)]
 struct SerializableInputEvent {
     type_: EventType,

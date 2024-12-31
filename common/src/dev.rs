@@ -1,15 +1,32 @@
-use evdev::{uinput::{VirtualDevice, VirtualDeviceBuilder}, AttributeSet, Key, RelativeAxisType};
+use evdev::{uinput::{VirtualDevice, VirtualDeviceBuilder}, AttributeSet, EventType, InputEvent, Key, RelativeAxisType};
 
-pub fn make_virtual_devices() -> std::io::Result<(VirtualDevice, VirtualDevice)> {
-    let keys = AttributeSet::from_iter(ALL_KEYS);
+pub fn pick_device() -> evdev::Device {
+    use std::io::prelude::*;
 
-    let keyboard_device = VirtualDeviceBuilder::new()?
+    let mut devices = evdev::enumerate().map(|t| t.1).collect::<Vec<_>>();
+    // readdir returns them in reverse order from their eventN names for some reason
+    devices.reverse();
+    for (i, d) in devices.iter().enumerate() {
+        println!("{}: {}", i, d.name().unwrap_or("Unnamed device"));
+    }
+    print!("Select the device [0-{}]: ", devices.len());
+    let _ = std::io::stdout().flush();
+    let mut chosen = String::new();
+    std::io::stdin().read_line(&mut chosen).unwrap();
+    let n = chosen.trim().parse::<usize>().unwrap();
+    devices.into_iter().nth(n).unwrap()
+}
+
+pub fn make_keyboard() -> std::io::Result<VirtualDevice> {
+    Ok(VirtualDeviceBuilder::new()?
         .name("Fake KVM Keyboard")
-        .with_keys(&keys)?
+        .with_keys(&AttributeSet::from_iter(ALL_KEYS))?
         .build()
-        .expect("Could not build virtual keyboard device");
+        .expect("Could not build virtual keyboard device"))
+}
 
-    let mouse_device = VirtualDeviceBuilder::new()?
+pub fn make_mouse() -> std::io::Result<VirtualDevice> {
+    Ok(VirtualDeviceBuilder::new()?
         .name("Fake KVM Mouse")
         .with_relative_axes(&AttributeSet::from_iter([
             RelativeAxisType::REL_X,
@@ -18,9 +35,18 @@ pub fn make_virtual_devices() -> std::io::Result<(VirtualDevice, VirtualDevice)>
             RelativeAxisType::REL_HWHEEL,
         ]))?
         .build()
-        .expect("Could not build virtual keyboard device");
+        .expect("Could not build virtual keyboard device"))
+}
 
-    Ok((keyboard_device, mouse_device))
+pub fn release_all(device: &mut VirtualDevice) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: consider device.supported_keys()
+    device.emit(&ALL_KEYS.map(|key| InputEvent::new(
+            EventType::KEY,
+            key.code(),
+            0
+        )))?;
+
+    Ok(())
 }
 
 const ALL_KEYS: [Key; 202] = [
