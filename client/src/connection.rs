@@ -1,14 +1,13 @@
 use std::{
     fmt,
     net::TcpStream,
-    ops::Deref,
-    sync::{mpsc, Arc, Mutex},
+    sync::mpsc,
     thread,
 };
 
 use chacha20poly1305::{
-    aead::{Aead, OsRng},
-    ChaCha20Poly1305, KeyInit, Nonce,
+    aead::OsRng,
+    ChaCha20Poly1305, KeyInit,
 };
 use x25519_dalek::{EphemeralSecret, PublicKey};
 

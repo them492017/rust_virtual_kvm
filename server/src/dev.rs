@@ -1,11 +1,17 @@
-use std::{net::{SocketAddr, UdpSocket}, sync::Arc};
+use std::{
+    net::{SocketAddr, UdpSocket},
+    sync::Arc,
+};
 
 use chacha20poly1305::ChaCha20Poly1305;
 use common::{error::DynError, net::Message, transport::Transport, udp2::TargetlessUdpTransport};
 use evdev::InputEventKind;
 use tokio::sync::RwLock;
 
-use crate::{keyboard_state::{KeyboardState, CYCLE_TARGET}, state::State};
+use crate::{
+    keyboard_state::{KeyboardState, CYCLE_TARGET},
+    state::State,
+};
 
 pub fn start_device_listener(
     mut device: evdev::Device,
