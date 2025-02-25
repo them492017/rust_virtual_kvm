@@ -12,4 +12,4 @@ evdev = { version = "0.12.2", features = ["serde"] }
 serde = { version = "1.0.214", features = ["derive"] }
 tokio = { version = "1.42.0", features = ["full"] }
 chacha20poly1305 = "0.10.1"
-x25519-dalek = { version = "2.0.1", features = ["serde"] }
+x25519-dalek = { version = "2.0.1", features = ["serde", "static_secrets"] }

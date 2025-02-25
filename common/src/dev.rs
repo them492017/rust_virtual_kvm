@@ -1,6 +1,9 @@
-use evdev::{uinput::{VirtualDevice, VirtualDeviceBuilder}, AttributeSet, EventType, InputEvent, Key, RelativeAxisType};
+use evdev::{
+    uinput::{VirtualDevice, VirtualDeviceBuilder},
+    AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
+};
 
-pub fn pick_device() -> evdev::Device {
+pub fn pick_device(name: &str) -> evdev::Device {
     use std::io::prelude::*;
 
     let mut devices = evdev::enumerate().map(|t| t.1).collect::<Vec<_>>();
@@ -9,7 +12,7 @@ pub fn pick_device() -> evdev::Device {
     for (i, d) in devices.iter().enumerate() {
         println!("{}: {}", i, d.name().unwrap_or("Unnamed device"));
     }
-    print!("Select the device [0-{}]: ", devices.len());
+    print!("Select the {} device [0-{}]: ", name, devices.len());
     let _ = std::io::stdout().flush();
     let mut chosen = String::new();
     std::io::stdin().read_line(&mut chosen).unwrap();
@@ -40,11 +43,7 @@ pub fn make_mouse() -> std::io::Result<VirtualDevice> {
 
 pub fn release_all(device: &mut VirtualDevice) -> Result<(), Box<dyn std::error::Error>> {
     // TODO: consider device.supported_keys()
-    device.emit(&ALL_KEYS.map(|key| InputEvent::new(
-            EventType::KEY,
-            key.code(),
-            0
-        )))?;
+    device.emit(&ALL_KEYS.map(|key| InputEvent::new(EventType::KEY, key.code(), 0)))?;
 
     Ok(())
 }
