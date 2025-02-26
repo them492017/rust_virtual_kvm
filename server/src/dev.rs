@@ -1,30 +1,21 @@
-use std::{
-    net::{SocketAddr, UdpSocket},
-    sync::Arc,
-};
-
-use chacha20poly1305::ChaCha20Poly1305;
-use common::{error::DynError, net::Message, transport::Transport, udp2::TargetlessUdpTransport};
+use common::{error::DynError, net::Message};
 use evdev::InputEventKind;
-use tokio::sync::RwLock;
+use tokio::sync::mpsc;
 
 use crate::{
     keyboard_state::{KeyboardState, CYCLE_TARGET},
-    state::State,
+    processor::InternalMessage,
+    server_message::ServerMessage,
 };
 
 pub fn start_device_listener(
     mut device: evdev::Device,
-    state: Arc<RwLock<State<ChaCha20Poly1305>>>,
-    address: SocketAddr,
+    event_sender: mpsc::Sender<InternalMessage>,
 ) -> Result<(), DynError> {
     println!(
         "Starting device listener for device: {}",
         device.name().unwrap_or("")
     );
-    let socket = UdpSocket::bind(address)?;
-    let mut transport: TargetlessUdpTransport<ChaCha20Poly1305> =
-        TargetlessUdpTransport::new(socket, address);
     let mut keyboard_state = KeyboardState::default();
 
     loop {
@@ -36,7 +27,11 @@ pub fn start_device_listener(
                     // handle combinations
                     if keyboard_state.is_combination_pressed(CYCLE_TARGET.to_vec()) {
                         // TODO: blocking write is almost certainly awful here
-                        let _ = state.blocking_write().cycle_target();
+                        event_sender
+                            .blocking_send(InternalMessage::LocalMessage {
+                                message: ServerMessage::Cycle,
+                            })
+                            .unwrap();
                     }
                 }
                 if event.value() == 0 {
@@ -44,19 +39,13 @@ pub fn start_device_listener(
                 }
             }
             // send the event
-            if let Some(address) = state
-                .blocking_read()
-                .get_target()
-                .map(|tgt| tgt.blocking_lock().address)
-            {
-                println!("Sending event to {}", address);
-                transport.set_address(address);
-                if let Err(err) = transport.send_message(Message::InputEvent {
-                    event: event.into(),
-                }) {
-                    panic!("Could not send input event to target client: {}", err)
-                }
-            }
+            event_sender
+                .blocking_send(InternalMessage::ClientMessage {
+                    message: Message::InputEvent {
+                        event: event.into(),
+                    },
+                })
+                .unwrap();
         });
     }
 }

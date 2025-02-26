@@ -1,150 +1,65 @@
+mod config;
 mod connection;
+mod listeners;
 
-use chacha20poly1305::ChaCha20Poly1305;
-use common::dev::{make_keyboard, make_mouse};
 use common::error::DynError;
-use common::net::Message;
-use common::transport::EventListener;
-use common::udp::UdpTransport;
-use evdev::{EventType, InputEvent};
-use std::env;
-use std::net::{SocketAddr, UdpSocket};
-use std::sync::mpsc;
+use config::parse_args;
+use listeners::{input_event::input_event_listener, special_event::special_event_processor};
+use std::{cmp::max, env, time::Duration};
 
 use crate::connection::Connection;
 
-fn main() -> Result<(), DynError> {
-    let mut config = init();
+const INITIAL_RETRY_SECONDS: u64 = 1;
+const MAX_RETRY_SECONDS: u64 = 180;
+const RETRY_MUTLIPLIER: u64 = 2;
+
+#[tokio::main]
+async fn main() -> Result<(), DynError> {
+    let (server_addr, client_addr) = parse_args(env::args())?;
     let mut connection: Connection = Connection::default();
+    let mut retry_seconds = INITIAL_RETRY_SECONDS;
 
     println!("Beginning main loop");
     loop {
-        if connection.is_connected {
+        let transport = connection
+            .connect(client_addr, server_addr)
+            .await
+            .inspect_err(|err| println!("Could not reconnect: {}", err));
+
+        if connection.is_connected && transport.is_ok() {
+            retry_seconds = INITIAL_RETRY_SECONDS;
             // process events
             println!("{:?}", connection);
-            if let Err(error) = process_events(&connection, &mut config) {
-                connection.is_connected = false;
-                println!("{:?}", error);
-                todo!("So far don't want to test reconnect logic")
-            } else {
-                println!("Connection closed gracefully");
-            }
-        } else {
-            // try to connect
-            connection
-                .connect(&config)
-                .inspect_err(|err| println!("Could not reconnect: {}", err))?;
-            dbg!(&connection);
-        }
-    }
-}
 
-fn init() -> Config {
-    println!("Initialising Virtual KVM Client");
+            let key = connection.symmetric_key.clone();
+            let input_event_processor =
+                tokio::spawn(
+                    async move { input_event_listener(key, client_addr, server_addr).await },
+                );
+            let special_event_processor =
+                tokio::spawn(async move { special_event_processor(transport.unwrap()).await });
 
-    let args: Vec<String> = env::args().collect();
-    let Ok((server_addr, client_addr)) = parse_args(&args) else {
-        panic!("Could not parse addresses")
-    };
-
-    let udp_socket = UdpSocket::bind(client_addr).expect("Could not bind socket");
-    println!("Started udp_socket on address {}", client_addr);
-
-    Config {
-        server_addr,
-        client_addr,
-        udp_socket,
-    }
-}
-
-fn process_events(conn: &Connection, config: &mut Config) -> Result<(), DynError> {
-    // start a listener thread which sends messages via channel
-    let udp_transport: UdpTransport<ChaCha20Poly1305> =
-        UdpTransport::new(config.udp_socket.try_clone().unwrap(), config.server_addr);
-    input_event_listener(udp_transport);
-
-    // get event from channel
-    while let Ok(event) = conn.channel_receiver.recv() {
-        println!("Received from TCP: {:?}", event);
-        match event {
-            Message::InputEvent { event, .. } => {
-                println!("{:?}", event);
-            }
-            Message::ClipboardChanged { content } => {
-                println!("New clipboard item: [{:?}]", content);
-            }
-            _ => {}
-        }
-    }
-
-    // when channel is closed return err or return () on shutdown
-    println!("Connection failed / channel closed or something???");
-    Ok(()) // TODO: connection failed?
-}
-
-fn input_event_listener(transport: UdpTransport<ChaCha20Poly1305>) {
-    let mut virtual_keyboard = make_keyboard().expect("Could not create virtual keyboard");
-    let mut virtual_mouse = make_mouse().expect("Could not create virtual mouse");
-    let (tx, rx) = mpsc::channel();
-
-    std::thread::spawn(move || {
-        let mut listener = EventListener::new(transport);
-        if let Err(err) = listener.listen(tx) {
-            println!("Something went wrong in UDP listener: {}", err);
-            unimplemented!("error handling for listener error not implemented")
-        }
-    });
-
-    println!("Started input event listener");
-    loop {
-        println!("Listening for message");
-        match rx.recv() {
-            Ok(event) => {
-                println!("{:?}", event);
-                match event {
-                    Message::InputEvent { event, .. } => {
-                        println!("{:?}", event);
-                        let input_event: InputEvent = event.into();
-                        match input_event.event_type() {
-                            EventType::KEY => {
-                                println!("Key event");
-                                let _ = virtual_keyboard.emit(&[input_event]);
-                            }
-                            EventType::RELATIVE => {
-                                println!("Mouse event");
-                                let _ = virtual_mouse.emit(&[input_event]);
-                            }
-                            _ => {
-                                println!("Unimplemented event type");
-                            }
-                        }
+            tokio::select! {
+                result = input_event_processor => {
+                    match result {
+                        Ok(Ok(())) => println!("Input event processor finished gracefully"),
+                        Ok(Err(err)) => eprintln!("Input event processor exited with error: {}", err),
+                        Err(err) => eprintln!("Input event processor panicked: {}", err),
                     }
-                    _ => {
-                        println!("Event is not a keyboard event: {:?}", event);
+                }
+                result = special_event_processor => {
+                    match result {
+                        Ok(Ok(())) => println!("Special event processor finished gracefully"),
+                        Ok(Err(err)) => eprintln!("Special event processor exited with error: {}", err),
+                        Err(err) => eprintln!("Special event processor panicked: {}", err),
                     }
                 }
             }
-            Err(err) => {
-                println!(
-                    "An error has occured when listening to UDP messages:\n{}",
-                    err
-                );
-                unimplemented!("error handling for UDP listener failing not implememnted")
-            }
+            // TODO: should broadcast CLOSED message or something when any finish
+            connection.sender.send(()).await?;
+        } else {
+            tokio::time::sleep(Duration::from_secs(retry_seconds)).await;
+            retry_seconds = max(retry_seconds * RETRY_MUTLIPLIER, MAX_RETRY_SECONDS);
         }
     }
-}
-
-fn parse_args(args: &[String]) -> Result<(SocketAddr, SocketAddr), DynError> {
-    if args.len() < 3 {
-        panic!("Not enough arguments. Please provide a server address and client address");
-    }
-
-    Ok((args[1].parse()?, args[2].parse()?))
-}
-
-struct Config {
-    server_addr: SocketAddr,
-    client_addr: SocketAddr,
-    udp_socket: UdpSocket,
 }

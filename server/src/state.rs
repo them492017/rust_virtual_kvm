@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
-use common::{crypto::Crypto, error::DynError, net::Message, transport::AsyncTransport};
-use tokio::sync::Mutex;
+use common::{crypto::Crypto, error::DynError};
+use uuid::Uuid;
 
 use crate::client::Client;
 
 #[allow(dead_code)]
 pub struct State<T: Crypto> {
-    clients: Vec<Arc<Mutex<Client<T>>>>,
+    clients: Vec<Client<T>>,
     pub clipboard_contents: Option<String>,
     target_idx: Option<usize>,
 }
@@ -15,19 +13,23 @@ pub struct State<T: Crypto> {
 #[allow(dead_code)]
 impl<T: Crypto> State<T> {
     pub fn add_client(&mut self, client: Client<T>) -> usize {
-        self.clients.push(Arc::new(Mutex::new(client)));
+        self.clients.push(client);
         self.clients.len() - 1
     }
 
-    pub fn get_target(&self) -> Option<Arc<Mutex<Client<T>>>> {
-        self.target_idx.map(|idx| self.clients[idx].clone())
+    pub fn get_target(&self) -> Option<&Client<T>> {
+        self.target_idx.map(|idx| &self.clients[idx])
     }
 
-    pub fn get_client(&self, client_idx: usize) -> Result<Arc<Mutex<Client<T>>>, DynError> {
+    pub fn get_client(&self, client_idx: usize) -> Result<&Client<T>, DynError> {
         if client_idx >= self.clients.len() {
             return Err("Index is out of bounds".into());
         }
-        Ok(self.clients[client_idx].clone())
+        Ok(&self.clients[client_idx])
+    }
+
+    pub fn get_client_by_id(&self, id: Uuid) -> Option<&Client<T>> {
+        self.clients.iter().find(|client| client.id == id)
     }
 
     pub async fn update_client(
@@ -38,10 +40,7 @@ impl<T: Crypto> State<T> {
         if client_idx >= self.clients.len() {
             return Err("Index is out of bounds".into());
         }
-        {
-            let mut client_lock = self.clients[client_idx].lock().await;
-            *client_lock = new_client;
-        }
+        self.clients[client_idx] = new_client;
         Ok(())
     }
 
@@ -81,25 +80,12 @@ impl<T: Crypto> State<T> {
         // }
     }
 
-    pub async fn mark_disconnected(&self, client_idx: usize) -> Result<(), DynError> {
+    pub async fn mark_disconnected(&mut self, client_idx: usize) -> Result<(), DynError> {
         if client_idx >= self.clients.len() {
             return Err("Index is out of bounds".into());
         }
-        {
-            let mut client_lock = self.clients[client_idx].lock().await;
-            client_lock.connected = false;
-        }
+        self.clients[client_idx].connected = false;
         Ok(())
-    }
-
-    pub async fn send_message_to_client(
-        &self,
-        client_idx: usize,
-        message: Message,
-    ) -> Result<(), DynError> {
-        let client_mutex = self.get_client(client_idx)?;
-        let mut client_lock = client_mutex.lock().await;
-        client_lock.transport.send_message(message).await
     }
 }
 

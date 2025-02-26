@@ -1,4 +1,4 @@
-use std::{future::Future, net::SocketAddr};
+use std::net::SocketAddr;
 
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
 use common::net::Message;
@@ -6,34 +6,22 @@ use common::tcp2::TokioTcpTransport;
 use common::transport::AsyncTransport;
 use common::{crypto::Crypto, error::DynError};
 use tokio::sync::mpsc::Sender;
+use uuid::Uuid;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
-#[allow(dead_code)]
-pub trait ClientInterface<T: Crypto>: Sized {
-    fn connect(
-        transport: TokioTcpTransport<T>,
-        sender: Sender<Message>,
-    ) -> impl Future<Output = Result<Self, DynError>>;
-    // called by keyboard / mouse listener threads
-    // send things on special patterns (eg clipboard)
-    // maybe heartbeats will be sent from main thread
-    // probably doesn't work since we need a mutable reference...
-    fn send_message(&mut self, message: Message) -> impl Future<Output = Result<(), DynError>>;
-}
-
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Client<T: Crypto> {
+    pub id: Uuid,
     pub connected: bool,
     pub address: SocketAddr,
-    pub transport: TokioTcpTransport<T>,
-    pub sender: Sender<Message>,
+    pub key: T,
+    pub message_sender: Sender<Message>,
 }
 
-impl ClientInterface<ChaCha20Poly1305> for Client<ChaCha20Poly1305> {
-    async fn connect(
-        mut transport: TokioTcpTransport<ChaCha20Poly1305>,
-        sender: Sender<Message>,
+impl Client<ChaCha20Poly1305> {
+    pub async fn connect(
+        transport: &mut TokioTcpTransport<ChaCha20Poly1305>,
+        message_sender: Sender<Message>,
     ) -> Result<Self, DynError> {
         println!("Initialising client");
 
@@ -92,7 +80,7 @@ impl ClientInterface<ChaCha20Poly1305> for Client<ChaCha20Poly1305> {
             )
         }?;
 
-        transport.set_key(cipher);
+        transport.set_key(cipher.clone());
 
         // send handshake with encryption enabled
         transport.send_message(Message::Handshake).await?;
@@ -107,14 +95,11 @@ impl ClientInterface<ChaCha20Poly1305> for Client<ChaCha20Poly1305> {
         println!("Successfully connected to client at address {:?}", addr);
 
         Ok(Client {
+            id: Uuid::new_v4(),
             connected: true,
+            key: cipher,
             address: addr,
-            transport,
-            sender,
+            message_sender,
         })
-    }
-
-    async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
-        self.transport.send_message(message).await
     }
 }

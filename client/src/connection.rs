@@ -1,44 +1,27 @@
-use std::{
-    fmt,
-    net::TcpStream,
-    sync::mpsc,
-    thread,
-};
+use std::{fmt, net::SocketAddr};
 
-use chacha20poly1305::{
-    aead::OsRng,
-    ChaCha20Poly1305, KeyInit,
-};
+use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
+use tokio::{net::TcpStream, sync::mpsc};
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
-use crate::Config;
-use common::{
-    error::DynError,
-    net::Message,
-    tcp::TcpTransport,
-    transport::{EventListener, Transport},
-};
+use common::{error::DynError, net::Message, tcp2::TokioTcpTransport, transport::AsyncTransport};
 
 pub struct Connection {
-    // TODO: should have a tcp socket for the connection
-    pub listener_thread: Option<thread::JoinHandle<Result<(), DynError>>>,
-    pub channel_sender: mpsc::Sender<Message>,
-    pub channel_receiver: mpsc::Receiver<Message>,
+    pub sender: mpsc::Sender<()>, // TODO: maybe use type alias to indicate meaning
+    pub receiver: mpsc::Receiver<()>,
     pub symmetric_key: Option<ChaCha20Poly1305>,
     pub is_connected: bool,
 }
 
 impl Default for Connection {
     fn default() -> Self {
-        let listener_thread = None;
-        let (channel_sender, channel_receiver) = mpsc::channel();
+        let (channel_sender, channel_receiver) = mpsc::channel(1);
         let symmetric_key = None;
         let is_connected = false;
 
         Connection {
-            listener_thread,
-            channel_sender,
-            channel_receiver,
+            sender: channel_sender,
+            receiver: channel_receiver,
             symmetric_key,
             is_connected,
         }
@@ -48,42 +31,33 @@ impl Default for Connection {
 impl fmt::Debug for Connection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Connection")
-            .field("listener_thread", &self.listener_thread)
-            .field("channel_sender", &self.channel_sender)
-            .field("channel_receiver", &self.channel_receiver)
+            .field("channel_sender", &self.sender)
+            .field("channel_receiver", &self.receiver)
             .field("is_connected", &self.is_connected)
             .finish()
     }
 }
 
 impl Connection {
-    pub fn connect(&mut self, config: &Config) -> Result<(), DynError> {
+    pub async fn connect(
+        &mut self,
+        client_addr: SocketAddr,
+        server_addr: SocketAddr,
+    ) -> Result<TokioTcpTransport<ChaCha20Poly1305>, DynError> {
+        // TODO: could probably add a server secret + client secret to ensure sessions are uniqiue
+        // as in TCP 1.3
         println!("Retrying connection to server");
 
-        if self.is_connected {
-            return Ok(());
-        }
-
-        // TODO: could try to reuse symmetric key on reconnect
-        // if let Some(key) = self.symmetric_key.as_ref() {
-        //     // do something
-        //     println!("Attempting to reuse symmetric key")
-        // } else {
-        //     // do something else
-        //     println!("Fully retrying connection")
-        // }
-
-        let socket = TcpStream::connect(config.server_addr)?;
-        let mut transport: TcpTransport<ChaCha20Poly1305> =
-            TcpTransport::new(socket.try_clone().unwrap());
+        let socket = TcpStream::connect(server_addr).await?;
+        let mut transport: TokioTcpTransport<ChaCha20Poly1305> = TokioTcpTransport::new(socket);
 
         println!("Sending ClientInit message to server");
-        transport.send_message(Message::ClientInit {
-            addr: config.client_addr,
-        })?;
+        transport
+            .send_message(Message::ClientInit { addr: client_addr })
+            .await?;
 
         let server_pub_key =
-            if let Message::ExchangePubKey { pub_key } = transport.receive_message()? {
+            if let Message::ExchangePubKey { pub_key } = transport.receive_message().await? {
                 println!("Received pub key from server");
                 pub_key
             } else {
@@ -99,13 +73,15 @@ impl Connection {
         // send pub key to server
         // TODO: sign this message
         println!("Sending pub key to server");
-        transport.send_message(Message::ExchangePubKey {
-            pub_key: public_key,
-        })?;
+        transport
+            .send_message(Message::ExchangePubKey {
+                pub_key: public_key,
+            })
+            .await?;
 
         // wait for ack
         println!("Waiting for server ack");
-        if let Message::Ack = transport.receive_message()? {
+        if let Message::Ack = transport.receive_message().await? {
             println!("Received ack from server");
         } else {
             return Err("Server did not acknowledge client public key".into());
@@ -113,6 +89,7 @@ impl Connection {
 
         // generate cipher
         let cipher = {
+            // TODO: could extract this into a trait for a more generic impl
             let shared_secret = secret.diffie_hellman(&server_pub_key);
             if !shared_secret.was_contributory() {
                 return Err("Shared secret was not contributory".into());
@@ -125,28 +102,15 @@ impl Connection {
         }?;
 
         self.symmetric_key = Some(cipher.clone());
-        transport.key = Some(cipher.clone());
+        transport.set_key(cipher);
         self.is_connected = true;
-
-        // TODO: refactor to use tokio and clean this up
-        let listener_channel = self.channel_sender.clone();
-        self.listener_thread = Some(thread::spawn(move || {
-            let mut transport: TcpTransport<ChaCha20Poly1305> = TcpTransport::new(socket);
-            transport.key = Some(cipher);
-            println!(
-                "Before starting to listen, the tcp transport had read: {:?}",
-                transport.curr
-            );
-            println!("Transport key is set: {}", transport.key.is_some());
-            let mut listener = EventListener::new(transport);
-            listener.listen(listener_channel)
-        }));
+        // TODO: need to set channels and stuff
 
         // send handshake with encryption enabled
-        transport.send_message(Message::Handshake)?;
+        transport.send_message(Message::Handshake).await?;
 
         println!("Waiting for server handshake");
-        if let Message::Handshake = self.channel_receiver.recv()? {
+        if let Message::Handshake = transport.receive_message().await? {
             println!("Received handshake from server");
         } else {
             return Err("Server did not initiate handshake".into());
@@ -154,9 +118,9 @@ impl Connection {
 
         println!(
             "Successfully connected to server at address {}",
-            config.server_addr
+            server_addr
         );
 
-        Ok(())
+        Ok(transport)
     }
 }

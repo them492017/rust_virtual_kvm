@@ -1,71 +1,126 @@
-use std::sync::Arc;
+use std::time::Duration;
 
 use chacha20poly1305::ChaCha20Poly1305;
-use common::{error::DynError, net::Message, tcp2::TokioTcpTransport};
+use common::{
+    error::DynError,
+    net::Message,
+    tcp2::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
+    transport::{AsyncTransportReader, AsyncTransportWriter},
+};
 use tokio::{
     net::TcpStream,
-    sync::{
-        mpsc::{self, Receiver},
-        RwLock,
-    },
+    sync::mpsc::{self, Receiver, Sender},
 };
+use uuid::Uuid;
 
 use crate::{
-    client::{Client, ClientInterface},
-    handlers::monitor::monitor_client,
-    state::State,
-    CHANNEL_BUF_LEN,
+    client::Client, processor::InternalMessage, server_message::ServerMessage, CHANNEL_BUF_LEN,
 };
+
+// TODO: refactor to a common location
+const HEARTBEAT_INTERVAL: u64 = 3;
+const NUM_RETRIES: u64 = 3;
 
 pub async fn handle_client(
     stream: TcpStream,
-    state: Arc<RwLock<State<ChaCha20Poly1305>>>,
+    client_sender: Sender<Client<ChaCha20Poly1305>>,
+    client_message_sender: Sender<InternalMessage>,
 ) -> Result<(), DynError> {
-    let transport = TokioTcpTransport::new(stream);
-    let (tx, rx) = mpsc::channel(CHANNEL_BUF_LEN);
-    let client: Client<ChaCha20Poly1305> = Client::connect(transport, tx).await?;
+    let mut transport = TokioTcpTransport::new(stream);
+    let (message_sender, message_receiver) = mpsc::channel(CHANNEL_BUF_LEN);
+    let client: Client<ChaCha20Poly1305> = Client::connect(&mut transport, message_sender).await?;
 
-    // add client to state vector
-    let client_idx = {
-        let mut state_writer = state.write().await;
-        state_writer.add_client(client)
-    };
+    // send client to event processor
+    let id = client.id;
+    client_sender.send(client).await?;
 
-    process_events(client_idx, state, rx).await
+    process_events(id, transport, message_receiver, client_message_sender).await
 }
 
 async fn process_events(
-    client_idx: usize,
-    state: Arc<RwLock<State<ChaCha20Poly1305>>>,
-    mut receiver: Receiver<Message>,
+    id: Uuid,
+    transport: TokioTcpTransport<ChaCha20Poly1305>,
+    message_receiver: Receiver<Message>,
+    client_message_sender: Sender<InternalMessage>,
 ) -> Result<(), DynError> {
-    // handle the sending and processing of heartbeat events
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-        let _ = monitor_client(client_idx, state_clone).await;
+    let (reader_transport, writer_transport) = transport.into_split();
+
+    let client_message_sender_clone = client_message_sender.clone();
+    let listener =
+        tokio::spawn(
+            async move { tcp_listener(reader_transport, client_message_sender_clone).await },
+        );
+    let sender = tokio::spawn(async move {
+        tcp_sender(
+            id,
+            writer_transport,
+            message_receiver,
+            client_message_sender,
+        )
+        .await
     });
-    // get event from channel
-    while let Some(event) = receiver.recv().await {
-        let state_reader = state.read().await;
-        println!("Received from TCP: {:?}", event);
-        // TODO: add error handling
-        match event {
-            Message::InputEvent { event, .. } => {
-                println!("{:?}", event);
-                unimplemented!("Handling input events over tcp is unimplemented")
+
+    tokio::select! {
+        result = listener => {
+            return result?
+        },
+        result = sender => {
+            return result?
+        },
+    }
+}
+
+async fn tcp_listener(
+    mut listener: TokioTcpTransportReader<ChaCha20Poly1305>,
+    client_message_sender: Sender<InternalMessage>,
+) -> Result<(), DynError> {
+    loop {
+        let message = listener.receive_message().await?;
+        println!("Received from TCP: {:?}", message);
+        client_message_sender
+            .send(InternalMessage::ClientMessage { message })
+            .await?;
+    }
+}
+
+async fn tcp_sender(
+    id: Uuid,
+    mut sender: TokioTcpTransportWriter<ChaCha20Poly1305>,
+    mut message_receiver: Receiver<Message>,
+    client_message_sender: Sender<InternalMessage>,
+) -> Result<(), DynError> {
+    // TODO: refactor magic numbers
+    let duration = Duration::from_secs(HEARTBEAT_INTERVAL);
+    let mut fail_count = 0;
+    let num_retries = NUM_RETRIES;
+
+    loop {
+        tokio::select! {
+            Some(message) = message_receiver.recv() => {
+                println!("Received message from channel");
+                sender.send_message(message).await?;
+                // TODO: figure out what to do about ? here...
+                // defeats the purpose of the failure count
+                fail_count = 0;
+            },
+            _ = tokio::time::sleep(duration) => {
+                println!("Sending heartbeat");
+                if let Err(err) = sender.send_message(Message::Heartbeat).await {
+                    fail_count += 1;
+                    println!(
+                        "Failed hearbeats {}/{} for client: {}",
+                        fail_count, num_retries, err
+                    );
+
+                    if fail_count >= num_retries {
+                        let message = ServerMessage::ClientDisconnect { id };
+                        client_message_sender.send(InternalMessage::LocalMessage { message }).await?;
+                        return Err("Heartbeat failed".into());
+                    }
+                } else {
+                    fail_count = 0;
+                }
             }
-            Message::ClipboardChanged { content } => {
-                println!("New clipboard item: [{:?}]", content);
-                let message = Message::ClipboardChanged { content };
-                state_reader
-                    .send_message_to_client(client_idx, message)
-                    .await?;
-            }
-            _ => {}
         }
     }
-
-    // when channel is closed return err or return () on shutdown
-    println!("Connection failed / channel closed or something???");
-    Ok(()) // TODO: connection failed?
 }

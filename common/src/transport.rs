@@ -22,6 +22,17 @@ pub trait AsyncTransport {
     fn receive_message(&mut self) -> impl std::future::Future<Output = Result<Message, DynError>>;
 }
 
+pub trait AsyncTransportReader {
+    fn receive_message(&mut self) -> impl std::future::Future<Output = Result<Message, DynError>>;
+}
+
+pub trait AsyncTransportWriter {
+    fn send_message(
+        &mut self,
+        message: Message,
+    ) -> impl std::future::Future<Output = Result<(), DynError>>;
+}
+
 pub struct EventListener<T: Transport> {
     transport: T,
 }

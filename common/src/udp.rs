@@ -1,9 +1,10 @@
-use std::net::{SocketAddr, UdpSocket};
+use std::net::SocketAddr;
 
 use chacha20poly1305::Nonce;
+use tokio::net::UdpSocket;
 
 use crate::error::DynError;
-use crate::transport::Transport;
+use crate::transport::AsyncTransport;
 use crate::{
     crypto::Crypto,
     net::{Message, MessageWithNonce},
@@ -12,24 +13,24 @@ use crate::{
 
 const BUFFER_LEN: usize = 256;
 
-pub struct UdpTransport<T: Crypto> {
+pub struct TokioUdpTransport<T: Crypto> {
     socket: UdpSocket,
     server_addr: SocketAddr,
     symmetric_key: Option<T>,
 }
 
-impl<T: Crypto> UdpTransport<T> {
-    pub fn new(socket: UdpSocket, server_addr: SocketAddr) -> Self {
-        UdpTransport {
+impl<T: Crypto> TokioUdpTransport<T> {
+    pub fn new(socket: UdpSocket, server_addr: SocketAddr, symmetric_key: Option<T>) -> Self {
+        TokioUdpTransport {
             socket,
             server_addr,
-            symmetric_key: None,
+            symmetric_key,
         }
     }
 }
 
-impl<T: Crypto> Transport for UdpTransport<T> {
-    fn send_message(&mut self, message: Message) -> Result<(), DynError> {
+impl<T: Crypto> AsyncTransport for TokioUdpTransport<T> {
+    async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
         let (encrypted, nonce) = if let Some(encryptor) = &self.symmetric_key {
@@ -41,13 +42,15 @@ impl<T: Crypto> Transport for UdpTransport<T> {
         let message_with_nonce = MessageWithNonce::new(encrypted, nonce);
         let encoded_with_nonce: Vec<u8> = bincode::serialize(&message_with_nonce)?;
 
-        self.socket.send_to(&encoded_with_nonce, self.server_addr)?;
+        self.socket
+            .send_to(&encoded_with_nonce, self.server_addr)
+            .await?;
         Ok(())
     }
 
-    fn receive_message(&mut self) -> Result<Message, DynError> {
+    async fn receive_message(&mut self) -> Result<Message, DynError> {
         let mut buf = [0; BUFFER_LEN];
-        let bytes_read = self.socket.recv(&mut buf)?;
+        let bytes_read = self.socket.recv(&mut buf).await?;
 
         if bytes_read == 0 {
             return Err("Connection closed".into());
