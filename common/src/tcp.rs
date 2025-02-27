@@ -38,12 +38,12 @@ impl<T: Crypto> TcpTransport<T> {
 
 impl<T: Crypto> Transport for TcpTransport<T> {
     fn send_message(&mut self, message: Message) -> Result<(), DynError> {
-        println!("Sending message {}", message);
+        // println!("Sending message {}", message);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
-        println!("Decrypted bytes");
-        print_debug_bytes(&encoded_message);
-        println!("======================");
+        // println!("Decrypted bytes");
+        // print_debug_bytes(&encoded_message);
+        // println!("======================");
 
         let (encrypted, nonce) = if let Some(encryptor) = &self.key {
             encryptor.encrypt(encoded_message)?
@@ -51,9 +51,9 @@ impl<T: Crypto> Transport for TcpTransport<T> {
             (encoded_message, Nonce::default())
         };
 
-        println!("Encrypted bytes");
-        print_debug_bytes(&encrypted);
-        println!("======================");
+        // println!("Encrypted bytes");
+        // print_debug_bytes(&encrypted);
+        // println!("======================");
 
         let message_with_nonce = MessageWithNonce::new(encrypted, nonce);
         let encoded_with_nonce: Vec<u8> = bincode::serialize(&message_with_nonce)?;
@@ -74,9 +74,9 @@ impl<T: Crypto> Transport for TcpTransport<T> {
 
         loop {
             let mut buf = [0; BUFFER_LEN];
-            println!("reading!!!");
+            // println!("reading!!!");
             let bytes_read = self.socket.read(&mut buf)?;
-            print_debug_bytes(&buf);
+            // print_debug_bytes(&buf);
 
             if bytes_read == 0 {
                 return Err("Connection closed".into());

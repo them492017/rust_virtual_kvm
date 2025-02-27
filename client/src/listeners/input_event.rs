@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use chacha20poly1305::ChaCha20Poly1305;
 use common::{
@@ -9,7 +9,7 @@ use common::{
     udp::TokioUdpTransport,
 };
 use evdev::{uinput::VirtualDevice, EventType, InputEvent};
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, time};
 
 pub async fn input_event_listener(
     key: Option<ChaCha20Poly1305>,
@@ -19,22 +19,16 @@ pub async fn input_event_listener(
     let virtual_keyboard = make_keyboard().expect("Could not create virtual keyboard");
     let virtual_mouse = make_mouse().expect("Could not create virtual mouse");
 
-    println!(
-        "Creating UDP transport for server at {}. Has key: {}",
-        server_addr,
-        key.is_some()
-    );
+    println!("Creating UDP transport for server at {}", server_addr);
     let udp_socket = UdpSocket::bind(client_addr).await?;
     let udp_transport: TokioUdpTransport<ChaCha20Poly1305> =
-        // TODO: for now, disable udp encryption due to server side bug
-        TokioUdpTransport::new(udp_socket, server_addr, None);
-    // TokioUdpTransport::new(udp_socket, server_addr, key);
+        TokioUdpTransport::new(udp_socket, server_addr, key);
 
     println!("Starting to listen for input events over UDP");
     input_event_processor(udp_transport, virtual_keyboard, virtual_mouse).await
 }
 
-pub async fn input_event_processor(
+async fn input_event_processor(
     mut transport: TokioUdpTransport<ChaCha20Poly1305>,
     mut virtual_keyboard: VirtualDevice,
     mut virtual_mouse: VirtualDevice,
@@ -50,11 +44,12 @@ pub async fn input_event_processor(
                         let input_event: InputEvent = event.into();
                         match input_event.event_type() {
                             EventType::KEY => {
-                                println!("Emitting key event");
+                                println!("Emitting key event: {:?}", input_event);
+                                time::sleep(Duration::from_secs(2)).await;
                                 virtual_keyboard.emit(&[input_event]).unwrap();
                             }
                             EventType::RELATIVE => {
-                                println!("Emitting mouse event");
+                                println!("Emitting mouse event: {:?}", input_event);
                                 virtual_mouse.emit(&[input_event]).unwrap();
                             }
                             _ => {

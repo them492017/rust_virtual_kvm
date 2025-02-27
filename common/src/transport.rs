@@ -1,5 +1,3 @@
-use std::sync::mpsc;
-
 use crate::{
     crypto::Crypto,
     error::DynError,
@@ -33,35 +31,15 @@ pub trait AsyncTransportWriter {
     ) -> impl std::future::Future<Output = Result<(), DynError>>;
 }
 
-pub struct EventListener<T: Transport> {
-    transport: T,
-}
-
-impl<T: Transport> EventListener<T> {
-    pub fn new(transport: T) -> Self {
-        EventListener { transport }
-    }
-
-    pub fn listen(&mut self, sender: mpsc::Sender<Message>) -> Result<(), DynError> {
-        loop {
-            println!("listener still alive");
-            match self.transport.receive_message() {
-                Ok(event) => sender.send(event)?,
-                Err(err) => return Err(err),
-            }
-        }
-    }
-}
-
 pub fn decrypt_and_deserialise_message<T: Crypto>(
     bytes: &[u8],
     key: &Option<T>,
 ) -> Result<Message, DynError> {
     let message_with_nonce: MessageWithNonce = bincode::deserialize(bytes)?;
 
-    println!("Encrypted bytes");
-    print_debug_bytes(&message_with_nonce.message);
-    println!("======================");
+    // println!("Encrypted bytes");
+    // print_debug_bytes(&message_with_nonce.message);
+    // println!("======================");
 
     let decrypted = if let Some(key) = &key {
         key.decrypt(message_with_nonce.message, message_with_nonce.nonce.into())?
@@ -69,9 +47,9 @@ pub fn decrypt_and_deserialise_message<T: Crypto>(
         message_with_nonce.message
     };
 
-    println!("Decrypted bytes");
-    print_debug_bytes(&decrypted);
-    println!("======================");
+    // println!("Decrypted bytes");
+    // print_debug_bytes(&decrypted);
+    // println!("======================");
 
     Ok(bincode::deserialize::<Message>(&decrypted)?)
 }

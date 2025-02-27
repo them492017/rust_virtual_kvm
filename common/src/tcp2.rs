@@ -57,12 +57,12 @@ impl<T: Crypto + Clone> TokioTcpTransport<T> {
 
 impl<T: Crypto + Clone> AsyncTransport for TokioTcpTransport<T> {
     async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
-        println!("Sending message {}", message);
+        // println!("Sending message {}", message);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
-        println!("Decrypted bytes");
-        print_debug_bytes(&encoded_message);
-        println!("======================");
+        // println!("Decrypted bytes");
+        // print_debug_bytes(&encoded_message);
+        // println!("======================");
 
         let (encrypted, nonce) = if let Some(encryptor) = &self.key {
             encryptor.encrypt(encoded_message)?
@@ -70,9 +70,9 @@ impl<T: Crypto + Clone> AsyncTransport for TokioTcpTransport<T> {
             (encoded_message, Nonce::default())
         };
 
-        println!("Encrypted bytes");
-        print_debug_bytes(&encrypted);
-        println!("======================");
+        // println!("Encrypted bytes");
+        // print_debug_bytes(&encrypted);
+        // println!("======================");
 
         let message_with_nonce = MessageWithNonce::new(encrypted, nonce);
         let encoded_with_nonce: Vec<u8> = bincode::serialize(&message_with_nonce)?;
@@ -84,7 +84,7 @@ impl<T: Crypto + Clone> AsyncTransport for TokioTcpTransport<T> {
             .chain(encoded_with_nonce)
             .collect();
 
-        print_debug_bytes(&final_message);
+        // print_debug_bytes(&final_message);
         self.socket.write_all(&final_message).await?;
         Ok(())
     }
@@ -95,7 +95,7 @@ impl<T: Crypto + Clone> AsyncTransport for TokioTcpTransport<T> {
         loop {
             let mut buf = [0; BUFFER_LEN];
             let bytes_read = self.socket.read(&mut buf).await?;
-            print_debug_bytes(&buf);
+            // print_debug_bytes(&buf);
 
             if bytes_read == 0 {
                 return Err("Connection closed".into());
@@ -133,12 +133,12 @@ impl<T: Crypto> TokioTcpTransportWriter<T> {
 
 impl<T: Crypto> AsyncTransportWriter for TokioTcpTransportWriter<T> {
     async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
-        println!("Sending message {}", message);
+        // println!("Sending message {}", message);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
-        println!("Decrypted bytes");
-        print_debug_bytes(&encoded_message);
-        println!("======================");
+        // println!("Decrypted bytes");
+        // print_debug_bytes(&encoded_message);
+        // println!("======================");
 
         let (encrypted, nonce) = if let Some(encryptor) = &self.key {
             encryptor.encrypt(encoded_message)?
@@ -146,9 +146,9 @@ impl<T: Crypto> AsyncTransportWriter for TokioTcpTransportWriter<T> {
             (encoded_message, Nonce::default())
         };
 
-        println!("Encrypted bytes");
-        print_debug_bytes(&encrypted);
-        println!("======================");
+        // println!("Encrypted bytes");
+        // print_debug_bytes(&encrypted);
+        // println!("======================");
 
         let message_with_nonce = MessageWithNonce::new(encrypted, nonce);
         let encoded_with_nonce: Vec<u8> = bincode::serialize(&message_with_nonce)?;
@@ -160,7 +160,7 @@ impl<T: Crypto> AsyncTransportWriter for TokioTcpTransportWriter<T> {
             .chain(encoded_with_nonce)
             .collect();
 
-        print_debug_bytes(&final_message);
+        // print_debug_bytes(&final_message);
         self.socket.write_all(&final_message).await?;
         Ok(())
     }

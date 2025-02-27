@@ -17,20 +17,6 @@ use tokio::sync::mpsc;
 
 const CHANNEL_BUF_LEN: usize = 256;
 
-// if performance is an issue consider using atomicptr for shared state
-// pub struct SharedState<T: Crypto> {
-//     clients: Arc<AtomicPtr<Vec<Client<T>>>>,
-//     target: Arc<AtomicUsize>, // treat usize::MAX as no target
-// }
-//
-// impl<T: Crypto> SharedState<T> {
-//     pub fn new() -> Self {
-//         let clients = Arc::new(AtomicPtr::new(Vec::new().as_mut_ptr()));
-//         let target = Arc::new(AtomicUsize::new(usize::MAX));
-//         SharedState { clients, target }
-//     }
-// }
-
 #[tokio::main]
 async fn main() -> Result<(), DynError> {
     let Config {
