@@ -4,7 +4,7 @@ mod listeners;
 
 use common::error::DynError;
 use config::parse_args;
-use listeners::{input_event::input_event_listener, special_event::special_event_processor};
+use connection::ListenerHandles;
 use std::{cmp::max, env, time::Duration};
 
 use crate::connection::Connection;
@@ -29,37 +29,44 @@ async fn main() -> Result<(), DynError> {
         if connection.is_connected && transport.is_ok() {
             retry_seconds = INITIAL_RETRY_SECONDS;
             // process events
-            println!("{:?}", connection);
-
-            let key = connection.symmetric_key.clone();
-            let input_event_processor =
-                tokio::spawn(
-                    async move { input_event_listener(key, client_addr, server_addr).await },
-                );
-            let special_event_processor =
-                tokio::spawn(async move { special_event_processor(transport.unwrap()).await });
+            let ListenerHandles {
+                input_event: input_event_processor,
+                special_event: special_event_processor,
+                cancellation_token,
+            } = connection
+                .spawn_listeners(transport.unwrap(), server_addr, client_addr)
+                .await?;
 
             tokio::select! {
                 result = input_event_processor => {
                     match result {
                         Ok(Ok(())) => println!("Input event processor finished gracefully"),
                         Ok(Err(err)) => eprintln!("Input event processor exited with error: {}", err),
-                        Err(err) => eprintln!("Input event processor panicked: {}", err),
+                        Err(err) => {
+                            eprintln!("Input event processor panicked: {}", err);
+                            panic!();
+                        },
                     }
                 }
                 result = special_event_processor => {
                     match result {
                         Ok(Ok(())) => println!("Special event processor finished gracefully"),
                         Ok(Err(err)) => eprintln!("Special event processor exited with error: {}", err),
-                        Err(err) => eprintln!("Special event processor panicked: {}", err),
+                        Err(err) => {
+                            eprintln!("Special event processor panicked: {}", err);
+                            panic!();
+                        },
                     }
                 }
             }
-            // TODO: should broadcast CLOSED message or something when any finish
-            connection.sender.send(()).await?;
+            cancellation_token.cancel();
         } else {
             tokio::time::sleep(Duration::from_secs(retry_seconds)).await;
             retry_seconds = max(retry_seconds * RETRY_MUTLIPLIER, MAX_RETRY_SECONDS);
+            println!(
+                "Could not connect to client. Waiting {} seconds",
+                retry_seconds
+            );
         }
     }
 }

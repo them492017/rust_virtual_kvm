@@ -1,40 +1,31 @@
-use std::{fmt, net::SocketAddr};
+use std::net::SocketAddr;
 
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::{net::TcpStream, task::JoinHandle};
+use tokio_util::sync::CancellationToken;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 use common::{error::DynError, net::Message, tcp2::TokioTcpTransport, transport::AsyncTransport};
 
+use crate::listeners::{input_event::input_event_listener, special_event::special_event_processor};
+
 pub struct Connection {
-    pub sender: mpsc::Sender<()>, // TODO: maybe use type alias to indicate meaning
-    pub receiver: mpsc::Receiver<()>,
-    pub symmetric_key: Option<ChaCha20Poly1305>,
     pub is_connected: bool,
+    symmetric_key: Option<ChaCha20Poly1305>,
+    transport: Option<TokioTcpTransport<ChaCha20Poly1305>>,
 }
 
 impl Default for Connection {
     fn default() -> Self {
-        let (channel_sender, channel_receiver) = mpsc::channel(1);
         let symmetric_key = None;
         let is_connected = false;
+        let transport = None;
 
         Connection {
-            sender: channel_sender,
-            receiver: channel_receiver,
-            symmetric_key,
             is_connected,
+            symmetric_key,
+            transport,
         }
-    }
-}
-
-impl fmt::Debug for Connection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Connection")
-            .field("channel_sender", &self.sender)
-            .field("channel_receiver", &self.receiver)
-            .field("is_connected", &self.is_connected)
-            .finish()
     }
 }
 
@@ -44,7 +35,7 @@ impl Connection {
         client_addr: SocketAddr,
         server_addr: SocketAddr,
     ) -> Result<TokioTcpTransport<ChaCha20Poly1305>, DynError> {
-        // TODO: could probably add a server secret + client secret to ensure sessions are uniqiue
+        // TODO: add a server secret + client secret to ensure sessions are uniqiue
         // as in TCP 1.3
         println!("Retrying connection to server");
 
@@ -89,7 +80,7 @@ impl Connection {
 
         // generate cipher
         let cipher = {
-            // TODO: could extract this into a trait for a more generic impl
+            // extract this into a trait method if supporting different keys
             let shared_secret = secret.diffie_hellman(&server_pub_key);
             if !shared_secret.was_contributory() {
                 return Err("Shared secret was not contributory".into());
@@ -104,7 +95,6 @@ impl Connection {
         self.symmetric_key = Some(cipher.clone());
         transport.set_key(cipher);
         self.is_connected = true;
-        // TODO: need to set channels and stuff
 
         // send handshake with encryption enabled
         transport.send_message(Message::Handshake).await?;
@@ -123,4 +113,36 @@ impl Connection {
 
         Ok(transport)
     }
+
+    pub async fn spawn_listeners(
+        &self,
+        transport: TokioTcpTransport<ChaCha20Poly1305>,
+        server_addr: SocketAddr,
+        client_addr: SocketAddr,
+    ) -> Result<ListenerHandles, DynError> {
+        if self.transport.is_none() {
+            return Err("Listeners cannot be created without a transport".into());
+        }
+        let key = self.symmetric_key.clone();
+        let cancellation_token = CancellationToken::new();
+        let cloned_token = cancellation_token.clone();
+        let input_event = tokio::spawn(async move {
+            input_event_listener(key, client_addr, server_addr, cloned_token).await
+        });
+        let cloned_token = cancellation_token.clone();
+        let special_event =
+            tokio::spawn(async move { special_event_processor(transport, cloned_token).await });
+
+        Ok(ListenerHandles {
+            input_event,
+            special_event,
+            cancellation_token,
+        })
+    }
+}
+
+pub struct ListenerHandles {
+    pub input_event: JoinHandle<Result<(), DynError>>,
+    pub special_event: JoinHandle<Result<(), DynError>>,
+    pub cancellation_token: CancellationToken,
 }
