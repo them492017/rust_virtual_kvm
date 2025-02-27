@@ -2,11 +2,12 @@ use std::net::SocketAddr;
 
 use chacha20poly1305::ChaCha20Poly1305;
 use common::{
-    dev::pick_device, error::DynError, net::Message, transport::AsyncTransport,
-    udp2::TargetlessUdpTransport,
+    error::DynError, net::Message, transport::AsyncTransport, udp2::TargetlessUdpTransport,
 };
-use evdev::Device;
-use tokio::{net::UdpSocket, sync::mpsc};
+use tokio::{
+    net::UdpSocket,
+    sync::{broadcast, mpsc},
+};
 
 use crate::{client::Client, server_message::ServerMessage, state::State};
 
@@ -22,6 +23,7 @@ pub async fn event_processor(
     mut device_message_receiver: mpsc::Receiver<InternalMessage>,
     mut client_message_receiver: mpsc::Receiver<InternalMessage>,
     mut client_receiver: mpsc::Receiver<Client<ChaCha20Poly1305>>,
+    mut grab_request_sender: broadcast::Sender<bool>,
 ) -> Result<(), DynError> {
     // device_receiver receives incoming messages from device listeners
     // message is either of type Message or SpecialEvent
@@ -36,13 +38,12 @@ pub async fn event_processor(
     let socket = UdpSocket::bind(server_addr).await?;
     let mut transport: TargetlessUdpTransport<ChaCha20Poly1305> =
         TargetlessUdpTransport::new(socket, server_addr);
-    let (mut keyboard, mut mouse) = (pick_device("Keyboard"), pick_device("Mouse"));
 
     loop {
         tokio::select! {
             msg = device_message_receiver.recv() => {
                 if let Some(message) = msg {
-                    handle_device_message(message, &mut state, &mut transport, &mut keyboard, &mut mouse).await?;
+                    handle_device_message(message, &mut state, &mut transport, &mut grab_request_sender).await?;
                 } else {
                     println!("Event processor receiver was closed");
                     return Err("Event processor receiver was closed".into());
@@ -75,8 +76,7 @@ async fn handle_device_message(
     msg: InternalMessage,
     state: &mut State<ChaCha20Poly1305>,
     transport: &mut TargetlessUdpTransport<ChaCha20Poly1305>,
-    keyboard: &mut Device,
-    mouse: &mut Device,
+    grab_request_sender: &mut broadcast::Sender<bool>,
 ) -> Result<(), DynError> {
     match msg {
         InternalMessage::ClientMessage { message } => {
@@ -115,15 +115,18 @@ async fn handle_device_message(
                 ServerMessage::Cycle => {
                     println!("Cycling target");
                     // TODO: fix this
-                    let initial_target_was_none = state.get_target().is_none();
+                    // TODO: need to find a way to release all keys on the previous target's keyboard when
+                    // target changes
+                    let prev = state.get_target().is_none();
                     state.cycle_target()?;
-
-                    if initial_target_was_none && state.get_target().is_some() {
-                        keyboard.grab().unwrap();
-                        mouse.grab().unwrap();
-                    } else if !initial_target_was_none && state.get_target().is_none() {
-                        keyboard.ungrab().unwrap();
-                        mouse.ungrab().unwrap();
+                    let curr = state.get_target().is_none();
+                    if prev && !curr {
+                        // should grab
+                        grab_request_sender.send(true)?;
+                    }
+                    if !prev && curr {
+                        // should ungrab
+                        grab_request_sender.send(false)?;
                     }
                 }
             }
@@ -141,6 +144,10 @@ async fn handle_client_message(
         InternalMessage::ClientMessage { message } => match &message {
             Message::Heartbeat => {
                 println!("Received heartbeat from client");
+            },
+            Message::ClipboardChanged { content } => {
+                println!("Received clipboard content from client: {}", content);
+                state.clipboard_contents = Some(content.to_string()); // TODO: race condition...
             }
             _ => {
                 unimplemented!("Received unimplemented client message: {:?}", message);

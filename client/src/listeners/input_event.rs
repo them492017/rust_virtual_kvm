@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
 use chacha20poly1305::ChaCha20Poly1305;
 use common::{
@@ -9,7 +9,7 @@ use common::{
     udp::TokioUdpTransport,
 };
 use evdev::{uinput::VirtualDevice, EventType, InputEvent};
-use tokio::{net::UdpSocket, time};
+use tokio::net::UdpSocket;
 
 pub async fn input_event_listener(
     key: Option<ChaCha20Poly1305>,
@@ -45,7 +45,6 @@ async fn input_event_processor(
                         match input_event.event_type() {
                             EventType::KEY => {
                                 println!("Emitting key event: {:?}", input_event);
-                                time::sleep(Duration::from_secs(2)).await;
                                 virtual_keyboard.emit(&[input_event]).unwrap();
                             }
                             EventType::RELATIVE => {
