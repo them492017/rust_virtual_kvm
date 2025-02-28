@@ -4,7 +4,7 @@ use chacha20poly1305::ChaCha20Poly1305;
 use common::{
     error::DynError,
     net::Message,
-    tcp2::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
+    tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
     transport::{AsyncTransportReader, AsyncTransportWriter},
 };
 use tokio::sync::mpsc;

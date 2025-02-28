@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
 use common::net::Message;
-use common::tcp2::TokioTcpTransport;
+use common::tcp::TokioTcpTransport;
 use common::transport::AsyncTransport;
 use common::{crypto::Crypto, error::DynError};
 use tokio::sync::mpsc::Sender;

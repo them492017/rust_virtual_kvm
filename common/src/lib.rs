@@ -3,7 +3,6 @@ pub mod dev;
 pub mod error;
 pub mod net;
 pub mod tcp;
-pub mod tcp2;
 pub mod transport;
 pub mod udp;
 pub mod udp2;

@@ -5,7 +5,7 @@ use tokio::{net::TcpStream, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
-use common::{error::DynError, net::Message, tcp2::TokioTcpTransport, transport::AsyncTransport};
+use common::{error::DynError, net::Message, tcp::TokioTcpTransport, transport::AsyncTransport};
 
 use crate::listeners::{input_event::input_event_listener, special_event::special_event_processor};
 

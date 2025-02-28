@@ -17,7 +17,7 @@ pub enum InternalMessage {
     LocalMessage { message: ServerMessage },
 }
 
-// TODO: at some point should handle batches of events, not just single events
+// TODO: handle batches of events, not just single events
 pub async fn event_processor(
     server_addr: SocketAddr,
     mut device_message_receiver: mpsc::Receiver<InternalMessage>,
@@ -144,7 +144,7 @@ async fn handle_client_message(
         InternalMessage::ClientMessage { message } => match &message {
             Message::Heartbeat => {
                 println!("Received heartbeat from client");
-            },
+            }
             Message::ClipboardChanged { content } => {
                 println!("Received clipboard content from client: {}", content);
                 state.clipboard_contents = Some(content.to_string()); // TODO: race condition...

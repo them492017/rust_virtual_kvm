@@ -32,6 +32,10 @@ impl<T: Crypto> State<T> {
         self.clients.iter().find(|client| client.id == id)
     }
 
+    pub fn get_client_by_id_mut(&mut self, id: Uuid) -> Option<&mut Client<T>> {
+        self.clients.iter_mut().find(|client| client.id == id)
+    }
+
     pub async fn update_client(
         &mut self,
         client_idx: usize,
@@ -86,6 +90,15 @@ impl<T: Crypto> State<T> {
         }
         self.clients[client_idx].connected = false;
         Ok(())
+    }
+
+    pub async fn mark_disconnected_by_id(&mut self, id: Uuid) -> Result<(), DynError> {
+        if let Some(client) = self.get_client_by_id_mut(id) {
+            client.connected = false;
+            Ok(())
+        } else {
+            Err(format!("Could not find client with id {id}").into())
+        }
     }
 }
 
