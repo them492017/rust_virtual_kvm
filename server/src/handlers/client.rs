@@ -89,7 +89,6 @@ async fn tcp_sender(
     mut message_receiver: Receiver<Message>,
     client_message_sender: Sender<InternalMessage>,
 ) -> Result<(), DynError> {
-    // TODO: refactor magic numbers
     let duration = Duration::from_secs(HEARTBEAT_INTERVAL);
     let mut fail_count = 0;
     let num_retries = NUM_RETRIES;

@@ -120,9 +120,6 @@ impl Connection {
         server_addr: SocketAddr,
         client_addr: SocketAddr,
     ) -> Result<ListenerHandles, DynError> {
-        if self.transport.is_none() {
-            return Err("Listeners cannot be created without a transport".into());
-        }
         let key = self.symmetric_key.clone();
         let cancellation_token = CancellationToken::new();
         let cloned_token = cancellation_token.clone();

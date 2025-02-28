@@ -53,8 +53,6 @@ impl<T: Crypto> State<T> {
             if i >= self.clients.len() {
                 return Err("Target index is out of bounds".into());
             }
-        } else {
-            // TODO: need to grab physical devices
         }
         self.target_idx = idx;
         Ok(())
