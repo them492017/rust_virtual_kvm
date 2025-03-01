@@ -2,6 +2,7 @@ mod client;
 mod config;
 mod dev;
 mod handlers;
+mod input_event_transport;
 mod keyboard_state;
 mod processor;
 mod server;

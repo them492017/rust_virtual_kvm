@@ -9,11 +9,11 @@ use crate::error::DynError;
 
 pub trait Crypto: Encryptor + Decryptor {}
 
-pub trait Encryptor {
+pub trait Encryptor: Clone {
     fn encrypt(&self, bytes: Vec<u8>) -> Result<(Vec<u8>, Nonce), DynError>;
 }
 
-pub trait Decryptor {
+pub trait Decryptor: Clone {
     fn decrypt(&self, bytes: Vec<u8>, nonce: Nonce) -> Result<Vec<u8>, DynError>;
 }
 

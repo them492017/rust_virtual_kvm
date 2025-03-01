@@ -21,11 +21,30 @@ impl<T: Crypto> State<T> {
         self.target_idx.map(|idx| &self.clients[idx])
     }
 
+    pub fn get_target_mut(&mut self) -> Option<&mut Client<T>> {
+        self.target_idx.map(|idx| &mut self.clients[idx])
+    }
+
+    pub fn get_target_idx(&self) -> Option<usize> {
+        self.target_idx
+    }
+
+    pub fn get_num_clients(&self) -> usize {
+        self.clients.len()
+    }
+
     pub fn get_client(&self, client_idx: usize) -> Result<&Client<T>, DynError> {
         if client_idx >= self.clients.len() {
             return Err("Index is out of bounds".into());
         }
         Ok(&self.clients[client_idx])
+    }
+
+    pub fn get_client_mut(&mut self, client_idx: usize) -> Result<&mut Client<T>, DynError> {
+        if client_idx >= self.clients.len() {
+            return Err("Index is out of bounds".into());
+        }
+        Ok(&mut self.clients[client_idx])
     }
 
     pub fn get_client_by_id(&self, id: Uuid) -> Option<&Client<T>> {
@@ -51,35 +70,12 @@ impl<T: Crypto> State<T> {
     pub fn set_target(&mut self, idx: Option<usize>) -> Result<(), DynError> {
         if let Some(i) = idx {
             if i >= self.clients.len() {
+                // TODO: type this error
                 return Err("Target index is out of bounds".into());
             }
         }
         self.target_idx = idx;
         Ok(())
-    }
-
-    pub fn cycle_target(&mut self) -> Result<(), DynError> {
-        // TODO: implement this properly
-        // the logic for choosing the next target should probably be moved
-        if self.clients.is_empty() {
-            return Ok(());
-        }
-
-        self.set_target(if self.target_idx.is_none() {
-            Some(0)
-        } else {
-            None
-        })
-
-        // for i in if let Some(idx) = self.target_idx {
-        //     idx..(idx + self.clients.len() - 1)
-        // } else {
-        //     0..(self.clients.len() - 1)
-        // } {
-        //     if self.clients[i].blocking_lock().connected {
-        //         self.target_idx = Some(i % self.clients.len())
-        //     }
-        // }
     }
 
     pub async fn mark_disconnected(&mut self, client_idx: usize) -> Result<(), DynError> {

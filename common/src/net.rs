@@ -22,12 +22,12 @@ impl MessageWithNonce {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
-    Swap { new_target: usize },
+    InputEvent { event: SerializableInputEvent },
+    TargetChangeNotification,
+    TargetChangeResponse,
     ClipboardChanged { content: String }, // TODO: content could be an image
-    ChangedActiveIndex { idx: usize },
     ClientInit { addr: SocketAddr },
     ExchangePubKey { pub_key: PublicKey },
-    InputEvent { event: SerializableInputEvent },
     Ack,
     Handshake,
     Heartbeat,
@@ -36,17 +36,17 @@ pub enum Message {
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Message::Swap { new_target } => write!(f, "Swap: new_target = {}", new_target),
+            Message::InputEvent { event } => {
+                write!(f, "InputEvent: event = {:?}", event)
+            }
+            Message::TargetChangeNotification => write!(f, "TargetChangeNotification"),
+            Message::TargetChangeResponse => write!(f, "TargetChangeResponse"),
             Message::ClipboardChanged { content } => {
                 write!(f, "ClipboardChanged: content = {}", content)
             }
-            Message::ChangedActiveIndex { idx } => write!(f, "ChangedActiveIndex: idx = {}", idx),
             Message::ClientInit { addr } => write!(f, "ClientInit: addr = {}", addr),
             Message::ExchangePubKey { pub_key } => {
                 write!(f, "ExchangePubKey: pub_key = {:?}", pub_key)
-            }
-            Message::InputEvent { event } => {
-                write!(f, "InputEvent: event = {:?}", event)
             }
             Message::Ack => write!(f, "Ack"),
             Message::Handshake => write!(f, "Handshake"),

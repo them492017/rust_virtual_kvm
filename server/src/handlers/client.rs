@@ -14,7 +14,11 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    client::Client, processor::InternalMessage, server_message::ServerMessage, CHANNEL_BUF_LEN,
+    client::{Client, Connection},
+    handlers::client_message_sender::ClientMessageSender,
+    processor::InternalMessage,
+    server_message::ServerMessage,
+    CHANNEL_BUF_LEN,
 };
 
 // TODO: refactor to a common location
@@ -45,6 +49,7 @@ async fn process_events(
 ) -> Result<(), DynError> {
     let (reader_transport, writer_transport) = transport.into_split();
 
+    let client_message_sender = ClientMessageSender::new(id, client_message_sender);
     let client_message_sender_clone = client_message_sender.clone();
     let listener =
         tokio::spawn(
@@ -72,14 +77,12 @@ async fn process_events(
 
 async fn tcp_listener(
     mut listener: TokioTcpTransportReader<ChaCha20Poly1305>,
-    client_message_sender: Sender<InternalMessage>,
+    client_message_sender: ClientMessageSender,
 ) -> Result<(), DynError> {
     loop {
         let message = listener.receive_message().await?;
         println!("Received from TCP: {:?}", message);
-        client_message_sender
-            .send(InternalMessage::ClientMessage { message })
-            .await?;
+        client_message_sender.send_client_message(message).await?;
     }
 }
 
@@ -87,7 +90,7 @@ async fn tcp_sender(
     id: Uuid,
     mut sender: TokioTcpTransportWriter<ChaCha20Poly1305>,
     mut message_receiver: Receiver<Message>,
-    client_message_sender: Sender<InternalMessage>,
+    client_message_sender: ClientMessageSender,
 ) -> Result<(), DynError> {
     let duration = Duration::from_secs(HEARTBEAT_INTERVAL);
     let mut fail_count = 0;
@@ -113,7 +116,7 @@ async fn tcp_sender(
 
                     if fail_count >= num_retries {
                         let message = ServerMessage::ClientDisconnect { id };
-                        client_message_sender.send(InternalMessage::LocalMessage { message }).await?;
+                        client_message_sender.send_server_message(message).await?;
                         return Err("Heartbeat failed".into());
                     }
                 } else {

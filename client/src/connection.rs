@@ -12,19 +12,16 @@ use crate::listeners::{input_event::input_event_listener, special_event::special
 pub struct Connection {
     pub is_connected: bool,
     symmetric_key: Option<ChaCha20Poly1305>,
-    transport: Option<TokioTcpTransport<ChaCha20Poly1305>>,
 }
 
 impl Default for Connection {
     fn default() -> Self {
         let symmetric_key = None;
         let is_connected = false;
-        let transport = None;
 
         Connection {
             is_connected,
             symmetric_key,
-            transport,
         }
     }
 }

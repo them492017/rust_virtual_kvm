@@ -34,7 +34,7 @@ pub async fn start_device_listener(
                         keyboard_state.release_key(key);
                     }
                 }
-                let message = InternalMessage::ClientMessage { message: Message::InputEvent { event: event.into() } };
+                let message = InternalMessage::ClientMessage { message: Message::InputEvent { event: event.into() }, sender: None };
                 event_sender.send(message).await?;
             },
             request = grab_request_receiver.recv() => {

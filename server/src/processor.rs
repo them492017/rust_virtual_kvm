@@ -1,20 +1,27 @@
 use std::net::SocketAddr;
 
 use chacha20poly1305::ChaCha20Poly1305;
-use common::{
-    error::DynError, net::Message, transport::AsyncTransport, udp2::TargetlessUdpTransport,
-};
+use common::{error::DynError, net::Message};
 use tokio::{
     net::UdpSocket,
     sync::{broadcast, mpsc},
 };
+use uuid::Uuid;
 
-use crate::{client::Client, server_message::ServerMessage, state::State};
+use crate::{
+    client::Client, input_event_transport::InputEventTransport, server_message::ServerMessage,
+    state::state::State,
+};
 
 #[derive(Debug)]
 pub enum InternalMessage {
-    ClientMessage { message: Message },
-    LocalMessage { message: ServerMessage },
+    ClientMessage {
+        message: Message,
+        sender: Option<Uuid>,
+    },
+    LocalMessage {
+        message: ServerMessage,
+    },
 }
 
 // TODO: handle batches of events, not just single events
@@ -36,8 +43,9 @@ pub async fn event_processor(
     // back to the global processor
     let mut state: State<ChaCha20Poly1305> = State::default();
     let socket = UdpSocket::bind(server_addr).await?;
-    let mut transport: TargetlessUdpTransport<ChaCha20Poly1305> =
-        TargetlessUdpTransport::new(socket, server_addr);
+    // let mut transport: TargetlessUdpTransport<ChaCha20Poly1305> =
+    //     TargetlessUdpTransport::new(socket, server_addr);
+    let mut transport = InputEventTransport::new(socket);
 
     loop {
         tokio::select! {
@@ -75,20 +83,22 @@ pub async fn event_processor(
 async fn handle_device_message(
     msg: InternalMessage,
     state: &mut State<ChaCha20Poly1305>,
-    transport: &mut TargetlessUdpTransport<ChaCha20Poly1305>,
+    transport: &mut InputEventTransport,
     grab_request_sender: &mut broadcast::Sender<bool>,
 ) -> Result<(), DynError> {
     match msg {
-        InternalMessage::ClientMessage { message } => {
+        InternalMessage::ClientMessage { message, .. } => {
             // send input event to correct client over udp
             match &message {
                 Message::InputEvent { .. } => {
-                    if let Some(target) = state.get_target() {
-                        {
-                            transport.set_address(target.address);
-                            transport.set_key(target.key.clone());
+                    if let Some(target) = state.get_target_mut() {
+                        if target.can_receive() {
+                            transport
+                                .send_message_to(message, target.address, Some(target.key.clone()))
+                                .await?;
+                        } else {
+                            target.buffer_message(message);
                         }
-                        transport.send_message(message).await?;
                     }
                 }
                 _ => {
@@ -114,20 +124,7 @@ async fn handle_device_message(
                 }
                 ServerMessage::Cycle => {
                     println!("Cycling target");
-                    // TODO: fix this
-                    // TODO: need to find a way to release all keys on the previous target's keyboard when
-                    // target changes
-                    let prev = state.get_target().is_none();
-                    state.cycle_target()?;
-                    let curr = state.get_target().is_none();
-                    if prev && !curr {
-                        // should grab
-                        grab_request_sender.send(true)?;
-                    }
-                    if !prev && curr {
-                        // should ungrab
-                        grab_request_sender.send(false)?;
-                    }
+                    state.cycle_target(grab_request_sender)?;
                 }
             }
         }
@@ -138,16 +135,25 @@ async fn handle_device_message(
 async fn handle_client_message(
     msg: InternalMessage,
     state: &mut State<ChaCha20Poly1305>,
-    transport: &mut TargetlessUdpTransport<ChaCha20Poly1305>,
+    transport: &mut InputEventTransport,
 ) -> Result<(), DynError> {
     match msg {
-        InternalMessage::ClientMessage { message } => match &message {
+        InternalMessage::ClientMessage { message, sender } => match &message {
             Message::Heartbeat => {
                 println!("Received heartbeat from client");
             }
             Message::ClipboardChanged { content } => {
                 println!("Received clipboard content from client: {}", content);
                 state.clipboard_contents = Some(content.to_string()); // TODO: race condition...
+            }
+            Message::TargetChangeResponse => {
+                println!("Received TargetChangeResponse from client {:?}", sender);
+                let sender =
+                    sender.ok_or::<DynError>("No sender provided for client message".into())?;
+                state
+                    .handle_change_target_response(sender, transport)
+                    .await?;
+                unimplemented!("Do not handle the TargetChangeResponse")
             }
             _ => {
                 unimplemented!("Received unimplemented client message: {:?}", message);

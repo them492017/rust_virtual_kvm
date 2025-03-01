@@ -5,7 +5,7 @@ mod listeners;
 use common::error::DynError;
 use config::parse_args;
 use connection::ListenerHandles;
-use std::{cmp::max, env, time::Duration};
+use std::{cmp::min, env, time::Duration};
 
 use crate::connection::Connection;
 
@@ -62,7 +62,7 @@ async fn main() -> Result<(), DynError> {
             cancellation_token.cancel();
         } else {
             tokio::time::sleep(Duration::from_secs(retry_seconds)).await;
-            retry_seconds = max(retry_seconds * RETRY_MUTLIPLIER, MAX_RETRY_SECONDS);
+            retry_seconds = min(retry_seconds * RETRY_MUTLIPLIER, MAX_RETRY_SECONDS);
             println!(
                 "Could not connect to client. Waiting {} seconds",
                 retry_seconds
