@@ -62,6 +62,9 @@ pub async fn special_event_listener(
                                 release_all(&mut virtual_keyboard)?;
                                 sender.send(Message::TargetChangeResponse).await?;
                             }
+                            Message::Heartbeat => {
+                                println!("Received heartbeat");
+                            }
                             _ => {
                                 unimplemented!()
                             }

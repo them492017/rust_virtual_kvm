@@ -38,7 +38,7 @@ pub async fn start_device_listener(
                 event_sender.send(message).await?;
             },
             request = grab_request_receiver.recv() => {
-                println!("Received grab request: {}", request.clone().unwrap());
+                println!("Received grab request: {:?}", request.as_ref().ok());
                 match request {
                     Ok(true) => {
                         device_stream.device_mut().grab().unwrap()
@@ -48,6 +48,7 @@ pub async fn start_device_listener(
                     },
                     Err(err) => {
                         println!("Grab request receive had an error: {}", err);
+                        panic!();
                     }
                 }
             }

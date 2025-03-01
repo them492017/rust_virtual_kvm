@@ -41,6 +41,7 @@ impl<T: Crypto + Clone> State<T> {
             let idx = (prev_idx + i) % (len + 1);
             if idx == len {
                 self.change_target(None, grab_request_sender)?;
+                return Ok(())
             }
             if self
                 .get_client(idx)
@@ -48,9 +49,10 @@ impl<T: Crypto + Clone> State<T> {
                 .unwrap_or(false)
             {
                 self.change_target(Some(idx), grab_request_sender)?;
+                return Ok(())
             }
         }
-        Ok(())
+        Err("Could not find target to swap to")? // TODO: need to catch this
     }
 
     fn send_change_target_notification(&mut self, idx: usize) -> Result<(), DynError> {

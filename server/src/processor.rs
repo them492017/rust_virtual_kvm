@@ -48,6 +48,7 @@ pub async fn event_processor(
     let mut transport = InputEventTransport::new(socket);
 
     loop {
+        println!("next iteration");
         tokio::select! {
             msg = device_message_receiver.recv() => {
                 if let Some(message) = msg {
@@ -123,7 +124,6 @@ async fn handle_device_message(
                         .await?;
                 }
                 ServerMessage::Cycle => {
-                    println!("Cycling target");
                     state.cycle_target(grab_request_sender)?;
                 }
             }
