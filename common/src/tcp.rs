@@ -190,7 +190,7 @@ impl<T: Crypto> AsyncTransportReader for TokioTcpTransportReader<T> {
         loop {
             let mut buf = [0; BUFFER_LEN];
             let bytes_read = self.socket.read(&mut buf).await?;
-            print_debug_bytes(&buf);
+            // print_debug_bytes(&buf);
 
             if bytes_read == 0 {
                 return Err("Connection closed".into());

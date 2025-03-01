@@ -35,9 +35,10 @@ impl<T: Crypto + Clone> State<T> {
         grab_request_sender: &mut broadcast::Sender<bool>,
     ) -> Result<(), DynError> {
         println!("Cycling target");
-        let prev_idx = self.get_target_idx().unwrap(); // maybe map None to an error
+        let prev_idx = self.get_target_idx().unwrap_or(0);
         let len = self.get_num_clients();
-        for i in 0..(len + 1) {
+        for i in 0..(len + 1) { // TODO: this shouldn't start at 0
+            println!("Checking {i}");
             let idx = (prev_idx + i) % (len + 1);
             if idx == len {
                 self.change_target(None, grab_request_sender)?;
@@ -57,7 +58,7 @@ impl<T: Crypto + Clone> State<T> {
 
     fn send_change_target_notification(&mut self, idx: usize) -> Result<(), DynError> {
         let client = self.get_client_mut(idx)?;
-        client.pending_target_change_responses -= 1;
+        client.pending_target_change_responses += 1;
         Ok(())
     }
 
