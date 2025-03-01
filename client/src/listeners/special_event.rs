@@ -2,11 +2,9 @@ use std::time::Duration;
 
 use chacha20poly1305::ChaCha20Poly1305;
 use common::{
-    error::DynError,
-    net::Message,
-    tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
-    transport::{AsyncTransportReader, AsyncTransportWriter},
+    dev::{make_keyboard, make_mouse, release_all}, error::DynError, net::Message, tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter}, transport::{AsyncTransportReader, AsyncTransportWriter}
 };
+use evdev::uinput::VirtualDevice;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -15,12 +13,14 @@ pub async fn special_event_processor(
     cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     println!("Started special event listener");
+    let virtual_keyboard = make_keyboard().expect("Could not create virtual keyboard");
+
     let (read_transport, write_transport) = transport.into_split();
     let (tx, rx) = mpsc::channel(8);
 
     let cloned_token = cancellation_token.clone();
     let listener =
-        tokio::spawn(async move { special_event_listener(read_transport, tx, cloned_token).await });
+        tokio::spawn(async move { special_event_listener(read_transport, tx, virtual_keyboard, cloned_token).await });
     let sender =
         tokio::spawn(
             async move { special_event_sender(write_transport, rx, cancellation_token).await },
@@ -40,6 +40,7 @@ pub async fn special_event_processor(
 pub async fn special_event_listener(
     mut reader: TokioTcpTransportReader<ChaCha20Poly1305>,
     sender: mpsc::Sender<Message>,
+    mut virtual_keyboard: VirtualDevice,
     cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     loop {
@@ -57,7 +58,13 @@ pub async fn special_event_listener(
                                 println!("New clipboard item: [{:?}]", content);
                                 sender.send(Message::Ack).await?; // TODO: temporary response
                             }
-                            _ => {}
+                            Message::TargetChangeNotification => {
+                                release_all(&mut virtual_keyboard)?;
+                                sender.send(Message::TargetChangeResponse).await?;
+                            }
+                            _ => {
+                                unimplemented!()
+                            }
                         }
                     }
                     Err(err) => {

@@ -147,6 +147,7 @@ dependencies = [
  "evdev",
  "serde",
  "tokio",
+ "tokio-util",
  "x25519-dalek",
 ]
 

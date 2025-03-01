@@ -3,6 +3,8 @@ use evdev::{
     AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
 };
 
+use crate::error::DynError;
+
 pub fn pick_device(name: &str) -> evdev::Device {
     use std::io::prelude::*;
 
@@ -41,7 +43,7 @@ pub fn make_mouse() -> std::io::Result<VirtualDevice> {
         .expect("Could not build virtual keyboard device"))
 }
 
-pub fn release_all(device: &mut VirtualDevice) -> Result<(), Box<dyn std::error::Error>> {
+pub fn release_all(device: &mut VirtualDevice) -> Result<(), DynError> {
     // TODO: consider device.supported_keys()
     device.emit(&ALL_KEYS.map(|key| InputEvent::new(EventType::KEY, key.code(), 0)))?;
 
