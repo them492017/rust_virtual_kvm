@@ -138,32 +138,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "chacha20poly1305",
- "common",
- "evdev",
- "serde",
- "tokio",
- "tokio-util",
- "x25519-dalek",
-]
-
-[[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "chacha20poly1305",
- "evdev",
- "serde",
- "tokio",
- "x25519-dalek",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -472,7 +446,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "chacha20poly1305",
- "common",
  "evdev",
  "serde",
  "tokio",
@@ -526,22 +499,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "chacha20poly1305",
- "client",
- "common",
- "evdev",
- "serde",
- "tokio",
- "tokio-util",
- "uuid",
- "x25519-dalek",
 ]
 
 [[package]]
