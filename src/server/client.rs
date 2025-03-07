@@ -139,10 +139,35 @@ impl<T: Crypto> Client<T> {
     }
 
     pub fn buffer_message(&mut self, message: Message) {
+        println!("Buffering message");
         self.pending_messages.push_back(message);
     }
 
     pub fn can_receive(&self) -> bool {
         self.pending_target_change_responses == 0 && self.pending_messages.is_empty()
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use tokio::sync::mpsc;
+
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
+    use uuid::Uuid;
+
+    use crate::common::net::Message;
+
+    use super::Client;
+
+    pub fn test_client_fixture(message_sender: mpsc::Sender<Message>) -> Client<ChaCha20Poly1305> {
+        Client {
+            id: Uuid::new_v4(),
+            connected: true,
+            address: "127.0.0.1:34567".parse().unwrap(),
+            key: ChaCha20Poly1305::new_from_slice(&[0;32]).unwrap(),
+            message_sender,
+            pending_target_change_responses: 0,
+            pending_messages: Vec::new().into(),
+        }
     }
 }

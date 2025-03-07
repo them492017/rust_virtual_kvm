@@ -13,5 +13,6 @@ evdev = { version = "0.12.2", features = ["serde", "tokio"] }
 serde = { version = "1.0.214", features = ["derive"] }
 tokio = { version = "1.42.0", features = ["full"] }
 tokio-util = "0.7.13"
+futures = "0.3.31"
 uuid = { version = "1.15.0", features = ["v4"] }
 

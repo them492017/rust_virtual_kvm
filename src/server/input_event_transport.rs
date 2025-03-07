@@ -24,6 +24,7 @@ impl InputEventTransport {
         address: SocketAddr,
         encryptor: Option<T>,
     ) -> Result<(), DynError> {
+        println!("Sending message to address {}", address);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
         let (encrypted, nonce) = if let Some(encryptor) = encryptor {

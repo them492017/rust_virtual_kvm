@@ -92,6 +92,7 @@ async fn handle_device_message(
             // send input event to correct client over udp
             match &message {
                 Message::InputEvent { .. } => {
+                    println!("Trying to send input event");
                     if let Some(target) = state.get_target_mut() {
                         if target.can_receive() {
                             transport

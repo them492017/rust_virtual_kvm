@@ -20,7 +20,7 @@ impl MessageWithNonce {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Message {
     InputEvent { event: SerializableInputEvent },
     TargetChangeNotification,
@@ -55,7 +55,7 @@ impl fmt::Display for Message {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SerializableInputEvent {
     type_: EventType,
     code: u16,

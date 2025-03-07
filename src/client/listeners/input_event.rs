@@ -51,7 +51,7 @@ async fn input_event_processor(
                     Ok(event) => {
                         println!("{:?}", event);
                         match event {
-                            Message::InputEvent { event, .. } => {
+                            Message::InputEvent { event } => {
                                 println!("{:?}", event);
                                 let input_event: InputEvent = event.into();
                                 match input_event.event_type() {

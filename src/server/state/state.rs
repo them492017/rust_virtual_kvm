@@ -7,7 +7,7 @@ use crate::{
 
 #[allow(dead_code)]
 pub struct State<T: Crypto> {
-    clients: Vec<Client<T>>,
+    pub clients: Vec<Client<T>>,
     pub clipboard_contents: Option<String>,
     target_idx: Option<usize>,
 }
@@ -105,5 +105,24 @@ impl<T: Crypto> Default for State<T> {
             clipboard_contents: None,
             target_idx: None,
         }
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use chacha20poly1305::ChaCha20Poly1305;
+    use tokio::sync::mpsc;
+
+    use crate::{common::net::Message, server::client::test::test_client_fixture};
+
+    use super::*;
+
+    pub fn test_state_fixture(client_channels: Vec<mpsc::Sender<Message>>, target_idx: Option<usize>) -> State<ChaCha20Poly1305> {
+        let mut state = State::default();
+        client_channels.into_iter().for_each(|channel| {
+            state.add_client(test_client_fixture(channel));
+        });
+        state.target_idx = target_idx;
+        state
     }
 }
