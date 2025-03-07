@@ -1,11 +1,9 @@
 use std::net::SocketAddr;
 
-use common::error::DynError;
-
-mod client;
-mod common;
-mod server;
-mod ui;
+use rust_virtual_kvm::common::error::DynError;
+use rust_virtual_kvm::server;
+use rust_virtual_kvm::client;
+use rust_virtual_kvm::ui;
 
 #[tokio::main]
 async fn main() -> Result<(), DynError> {

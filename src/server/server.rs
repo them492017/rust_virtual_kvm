@@ -13,6 +13,7 @@ pub async fn start_listening(
     client_message_sender: Sender<InternalMessage>,
 ) -> Result<(), DynError> {
     let tcp_listener = TcpListener::bind(server_address).await?;
+    println!("Bound TCP listener to {}", server_address);
 
     loop {
         let (socket, _) = tcp_listener.accept().await?;

@@ -16,10 +16,10 @@ use super::input_event_transport::InputEventTransport;
 const RING_BUFFER_LEN: usize = 1024;
 
 pub trait Connection<T: Crypto>: Sized {
-    async fn connect(
+    fn connect(
         transport: &mut TokioTcpTransport<T>,
         message_sender: Sender<Message>,
-    ) -> Result<Self, DynError>;
+    ) -> impl std::future::Future<Output = Result<Self, DynError>> + Send + Sync;
 }
 
 #[derive(Debug)]
