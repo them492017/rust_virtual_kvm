@@ -125,7 +125,7 @@ async fn handle_device_message(
                         .await?;
                 }
                 ServerMessage::Cycle => {
-                    state.cycle_target(grab_request_sender)?;
+                    state.cycle_target(grab_request_sender).await?;
                 }
             }
         }
@@ -154,7 +154,6 @@ async fn handle_client_message(
                 state
                     .handle_change_target_response(sender, transport)
                     .await?;
-                unimplemented!("Do not handle the TargetChangeResponse")
             }
             _ => {
                 unimplemented!("Received unimplemented client message: {:?}", message);

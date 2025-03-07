@@ -9,16 +9,17 @@ use crate::{
 use super::state::State;
 
 impl<T: Crypto + Clone> State<T> {
-    pub fn change_target(
+    pub async fn change_target(
         &mut self,
         new_idx: Option<usize>,
         grab_request_sender: &mut broadcast::Sender<bool>,
     ) -> Result<(), DynError> {
         println!("Changing target index to {:?}", new_idx);
         let prev = self.get_target().is_none();
+        let prev_idx = self.get_target_idx();
         self.set_target(new_idx)?;
-        if let Some(idx) = new_idx {
-            self.send_change_target_notification(idx)?;
+        if let Some(idx) = prev_idx {
+            self.send_change_target_notification(idx).await?;
         }
         let curr = self.get_target().is_none();
         if prev && !curr {
@@ -32,14 +33,14 @@ impl<T: Crypto + Clone> State<T> {
         Ok(())
     }
 
-    pub fn cycle_target(
+    pub async fn cycle_target(
         &mut self,
         grab_request_sender: &mut broadcast::Sender<bool>,
     ) -> Result<(), DynError> {
         let len = self.get_num_clients();
         let prev_idx = self.get_target_idx().unwrap_or(len);
 
-        (0..=len)
+        let target_idx = (0..=len)
             .map(|i| (prev_idx + i + 1) % (len + 1))
             .find(|&idx| {
                 idx == len
@@ -48,16 +49,20 @@ impl<T: Crypto + Clone> State<T> {
                         .map(|client| client.connected)
                         .unwrap_or(false)
             })
-            .ok_or("Could not find target to swap to".into())
-            .map(|idx| if idx == len { None } else { Some(idx) })
-            .and_then(|target_idx| self.change_target(target_idx, grab_request_sender))
+            .ok_or_else(|| -> DynError { "Could not find target to swap to".into() })
+            .map(|idx| if idx == len { None } else { Some(idx) })?;
+
+        self.change_target(target_idx, grab_request_sender).await
     }
 
-    fn send_change_target_notification(&mut self, idx: usize) -> Result<(), DynError> {
+    async fn send_change_target_notification(&mut self, idx: usize) -> Result<(), DynError> {
         let client = self.get_client_mut(idx)?;
         println!("Sending target change notif to client at index {}", idx);
         client.pending_target_change_responses += 1;
-        // TODO: actually send notificatoin
+        client
+            .message_sender
+            .send(crate::common::net::Message::TargetChangeNotification)
+            .await?;
         Ok(())
     }
 
@@ -96,7 +101,7 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender);
+            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
@@ -115,7 +120,7 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender);
+            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
@@ -145,7 +150,7 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender);
+            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
@@ -173,7 +178,7 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender);
+            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
@@ -211,10 +216,11 @@ mod test {
             let expected_target_idx = Some(0);
 
             // When
-            state.cycle_target(&mut grab_request_sender).unwrap();
+            let response = state.cycle_target(&mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
+            assert!(response.is_ok());
             assert_eq!(state.get_target_idx(), expected_target_idx);
         }
 
@@ -230,10 +236,11 @@ mod test {
             let expected_target_idx = Some(1);
 
             // When
-            state.cycle_target(&mut grab_request_sender).unwrap();
+            let response = state.cycle_target(&mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
+            assert!(response.is_ok());
             assert_eq!(state.get_target_idx(), expected_target_idx);
         }
 
@@ -249,10 +256,11 @@ mod test {
             let expected_target_idx = None;
 
             // When
-            state.cycle_target(&mut grab_request_sender).unwrap();
+            let response = state.cycle_target(&mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
+            assert!(response.is_ok());
             assert_eq!(state.get_target_idx(), expected_target_idx);
         }
 
@@ -268,10 +276,11 @@ mod test {
             let expected_target_idx = None;
 
             // When
-            state.cycle_target(&mut grab_request_sender).unwrap();
+            let response = state.cycle_target(&mut grab_request_sender).await;
             tokio::task::yield_now().await;
 
             // Then
+            assert!(response.is_ok());
             assert_eq!(state.get_target_idx(), expected_target_idx);
         }
     }

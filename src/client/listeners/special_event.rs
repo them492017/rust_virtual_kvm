@@ -72,7 +72,7 @@ pub async fn special_event_listener(
                                 println!("Received heartbeat");
                             }
                             _ => {
-                                unimplemented!()
+                                unimplemented!("Received unimplemented event")
                             }
                         }
                     }

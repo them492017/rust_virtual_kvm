@@ -45,6 +45,7 @@ pub fn make_mouse() -> std::io::Result<VirtualDevice> {
 
 pub fn release_all(device: &mut VirtualDevice) -> Result<(), DynError> {
     // TODO: consider device.supported_keys()
+    println!("Releasing all keys");
     device.emit(&ALL_KEYS.map(|key| InputEvent::new(EventType::KEY, key.code(), 0)))?;
 
     Ok(())
