@@ -6,7 +6,7 @@ use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 
 use crate::common::{
-    dev::{make_keyboard, make_mouse},
+    dev::{make_keyboard, make_mouse, release_all},
     error::DynError,
     net::Message,
     transport::AsyncTransport,
@@ -83,6 +83,7 @@ async fn input_event_processor(
                 }
             },
             _ = cancellation_token.cancelled() => {
+                release_all(&mut virtual_keyboard)?;
                 return Ok(())
             },
         }
