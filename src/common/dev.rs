@@ -1,6 +1,7 @@
+use std::{io, thread, time::Duration};
+
 use evdev::{
-    uinput::{VirtualDevice, VirtualDeviceBuilder},
-    AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
+    uinput::{VirtualDevice, VirtualDeviceBuilder}, AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType
 };
 
 use super::error::DynError;
@@ -23,15 +24,16 @@ pub fn pick_device(name: &str) -> evdev::Device {
 }
 
 pub fn make_keyboard() -> std::io::Result<VirtualDevice> {
-    Ok(VirtualDeviceBuilder::new()?
+    let device = VirtualDeviceBuilder::new()?
         .name("Fake KVM Keyboard")
         .with_keys(&AttributeSet::from_iter(ALL_KEYS))?
-        .build()
-        .expect("Could not build virtual keyboard device"))
+        .build();
+    thread::sleep(Duration::from_millis(100)); // delay so events will be emitted instantly
+    device
 }
 
 pub fn make_mouse() -> std::io::Result<VirtualDevice> {
-    Ok(VirtualDeviceBuilder::new()?
+    let device = VirtualDeviceBuilder::new()?
         .name("Fake KVM Mouse")
         .with_relative_axes(&AttributeSet::from_iter([
             RelativeAxisType::REL_X,
@@ -39,14 +41,36 @@ pub fn make_mouse() -> std::io::Result<VirtualDevice> {
             RelativeAxisType::REL_WHEEL,
             RelativeAxisType::REL_HWHEEL,
         ]))?
-        .build()
-        .expect("Could not build virtual keyboard device"))
+        .build();
+    thread::sleep(Duration::from_millis(100)); // delay so events will be emitted instantly
+    device
 }
 
-pub fn release_all(device: &mut VirtualDevice) -> Result<(), DynError> {
+pub trait InputDevice {
+    fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()>;
+}
+
+impl InputDevice for VirtualDevice {
+    fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()> {
+        self.emit(messages)
+    }
+}
+
+impl InputDevice for Device {
+    fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()> {
+        self.send_events(messages)
+    }
+}
+
+pub fn release_all<T: InputDevice>(device: &mut T) -> Result<(), DynError> {
     // TODO: consider device.supported_keys()
     println!("Releasing all keys");
-    device.emit(&ALL_KEYS.map(|key| InputEvent::new(EventType::KEY, key.code(), 0)))?;
+    ALL_KEYS.iter().for_each(|key| {
+        println!("Releasing {key:?}");
+        device
+            .emit(&[InputEvent::new(EventType::KEY, key.code(), 0)])
+            .unwrap();
+    });
 
     Ok(())
 }

@@ -2,7 +2,7 @@ use evdev::InputEventKind;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
-    common::{dev::{make_keyboard, release_all}, error::DynError, net::Message},
+    common::{dev::release_all, error::DynError, net::Message},
     server::keyboard_state::KeyboardState,
 };
 
@@ -21,7 +21,6 @@ pub async fn start_device_listener(
     );
     let mut keyboard_state = KeyboardState::default();
     let mut device_stream = device.into_event_stream()?;
-    let mut virtual_keyboard = make_keyboard()?;
 
     loop {
         tokio::select! {
@@ -45,10 +44,10 @@ pub async fn start_device_listener(
                 match request {
                     Ok(true) => {
                         device_stream.device_mut().grab().unwrap();
-                        release_all(&mut virtual_keyboard)?;
                     },
                     Ok(false) => {
-                        device_stream.device_mut().ungrab().unwrap()
+                        device_stream.device_mut().ungrab().unwrap();
+                        release_all(device_stream.device_mut())?;
                     },
                     Err(err) => {
                         println!("Grab request receive had an error: {}", err);
