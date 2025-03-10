@@ -80,6 +80,13 @@ impl<T: Crypto + Clone> State<T> {
         }
         Ok(())
     }
+
+    pub fn disconnect_client(&mut self, id: Uuid) {
+        println!("Client {} disconnected", id);
+        self.get_client_by_id_mut(id)
+            .expect("Client with given id should exist")
+            .connected = false;
+    }
 }
 
 #[cfg(test)]

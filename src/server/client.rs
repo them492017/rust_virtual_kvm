@@ -7,8 +7,7 @@ use uuid::Uuid;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 use crate::common::{
-    crypto::Crypto, error::DynError, net::Message, tcp::TokioTcpTransport,
-    transport::AsyncTransport,
+    crypto::Crypto, error::DynError, net::Message, tcp::TokioTcpTransport, transport::Transport,
 };
 
 use super::input_event_transport::InputEventTransport;
@@ -141,7 +140,6 @@ impl<T: Crypto> Client<T> {
     }
 
     pub fn buffer_message(&mut self, message: Message) {
-        println!("Buffering message");
         self.pending_messages.push_back(message);
     }
 

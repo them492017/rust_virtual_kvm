@@ -11,9 +11,7 @@ use super::{
     crypto::Crypto,
     error::DynError,
     net::{Message, MessageWithNonce},
-    transport::{
-        decrypt_and_deserialise_message, AsyncTransport, AsyncTransportReader, AsyncTransportWriter,
-    },
+    transport::{decrypt_and_deserialise_message, Transport, TransportReader, TransportWriter},
 };
 
 const HEADER_LEN: usize = 4;
@@ -54,7 +52,7 @@ impl<T: Crypto + Clone> TokioTcpTransport<T> {
     }
 }
 
-impl<T: Crypto + Clone> AsyncTransport for TokioTcpTransport<T> {
+impl<T: Crypto + Clone> Transport for TokioTcpTransport<T> {
     async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
         // println!("Sending message {}", message);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
@@ -130,7 +128,7 @@ impl<T: Crypto> TokioTcpTransportWriter<T> {
     }
 }
 
-impl<T: Crypto> AsyncTransportWriter for TokioTcpTransportWriter<T> {
+impl<T: Crypto> TransportWriter for TokioTcpTransportWriter<T> {
     async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
         // println!("Sending message {}", message);
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
@@ -182,7 +180,7 @@ impl<T: Crypto> TokioTcpTransportReader<T> {
     }
 }
 
-impl<T: Crypto> AsyncTransportReader for TokioTcpTransportReader<T> {
+impl<T: Crypto> TransportReader for TokioTcpTransportReader<T> {
     async fn receive_message(&mut self) -> Result<Message, DynError> {
         let mut message_len: Option<usize> = None;
 

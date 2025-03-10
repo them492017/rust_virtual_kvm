@@ -54,7 +54,7 @@ pub async fn event_processor(
                 if let Some(message) = msg {
                     handle_device_message(message, &mut state, &mut transport, &mut grab_request_sender).await?;
                 } else {
-                    println!("Event processor receiver was closed");
+                    eprintln!("Event processor receiver was closed");
                     return Err("Event processor receiver was closed".into());
                 }
             },
@@ -62,7 +62,7 @@ pub async fn event_processor(
                 if let Some(message) = msg {
                     handle_client_message(message, &mut state, &mut transport).await?;
                 } else {
-                    println!("Client receiver was closed");
+                    eprintln!("Client receiver was closed");
                     return Err("Client receiver was closed".into());
                 }
             },
@@ -72,7 +72,7 @@ pub async fn event_processor(
                         state.add_client(c);
                     },
                     None => {
-                        println!("Client receiver was closed");
+                        eprintln!("Client receiver was closed");
                         return Err("Client receiver was closed".into());
                     }
                 }
@@ -92,7 +92,6 @@ async fn handle_device_message(
             // send input event to correct client over udp
             match &message {
                 Message::InputEvent { .. } => {
-                    println!("Trying to send input event");
                     if let Some(target) = state.get_target_mut() {
                         if target.can_receive() {
                             transport
@@ -111,18 +110,9 @@ async fn handle_device_message(
         }
         InternalMessage::LocalMessage { message } => {
             // forward special event to client handler to be sent over tcp
-            println!("Local message: {:?}", message);
             match &message {
                 ServerMessage::ClientDisconnect { id } => {
-                    println!("Client {} disconnected", id);
-                    // TODO: sending this makes no sense
-                    state
-                        .get_client_by_id(*id)
-                        .expect("Client with given id should exist")
-                        .message_sender
-                        .clone()
-                        .send(Message::Heartbeat)
-                        .await?;
+                    state.disconnect_client(*id);
                 }
                 ServerMessage::Cycle => {
                     state.cycle_target(grab_request_sender).await?;
@@ -140,15 +130,11 @@ async fn handle_client_message(
 ) -> Result<(), DynError> {
     match msg {
         InternalMessage::ClientMessage { message, sender } => match &message {
-            Message::Heartbeat => {
-                println!("Received heartbeat from client");
-            }
+            Message::Heartbeat => {}
             Message::ClipboardChanged { content } => {
-                println!("Received clipboard content from client: {}", content);
-                state.clipboard_contents = Some(content.to_string()); // TODO: race condition...
+                state.clipboard_contents = Some(content.to_string()); // TODO: handle race condition...
             }
             Message::TargetChangeResponse => {
-                println!("Received TargetChangeResponse from client {:?}", sender);
                 let sender =
                     sender.ok_or::<DynError>("No sender provided for client message".into())?;
                 state
@@ -160,7 +146,7 @@ async fn handle_client_message(
             }
         },
         InternalMessage::LocalMessage { message } => {
-            unimplemented!("Received client message: {:?}", message)
+            unimplemented!("Received local message: {:?}", message)
         }
     };
     Ok(())

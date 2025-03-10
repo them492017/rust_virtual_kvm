@@ -9,7 +9,6 @@ async fn connect_client(
     client_addr: SocketAddr,
     server_addr: SocketAddr,
 ) -> Result<bool, DynError> {
-    println!("Connection client");
     let mut conn = Connection::default();
     conn.connect(client_addr, server_addr).await?;
     Ok(conn.is_connected)

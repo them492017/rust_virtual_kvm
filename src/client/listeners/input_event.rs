@@ -9,7 +9,7 @@ use crate::common::{
     dev::{make_keyboard, make_mouse, release_all},
     error::DynError,
     net::Message,
-    transport::AsyncTransport,
+    transport::Transport,
     udp::TokioUdpTransport,
 };
 
@@ -27,7 +27,6 @@ pub async fn input_event_listener(
     let udp_transport: TokioUdpTransport<ChaCha20Poly1305> =
         TokioUdpTransport::new(udp_socket, server_addr, key);
 
-    println!("Starting to listen for input events over UDP");
     input_event_processor(
         udp_transport,
         virtual_keyboard,
@@ -44,7 +43,6 @@ async fn input_event_processor(
     cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     loop {
-        println!("Listening for message");
         tokio::select! {
             message = transport.receive_message() => {
                 if let Ok(event) = message {
@@ -55,20 +53,18 @@ async fn input_event_processor(
                             let input_event: InputEvent = event.into();
                             match input_event.event_type() {
                                 EventType::KEY => {
-                                    println!("Emitting key event: {:?}", input_event);
                                     virtual_keyboard.emit(&[input_event]).unwrap();
                                 }
                                 EventType::RELATIVE => {
-                                    println!("Emitting mouse event: {:?}", input_event);
                                     virtual_mouse.emit(&[input_event]).unwrap();
                                 }
                                 _ => {
-                                    println!("Unimplemented event type");
+                                    eprintln!("Unimplemented event type: {input_event:?}");
                                 }
                             }
                         }
                         _ => {
-                            println!("Event is not a keyboard event: {:?}", event);
+                            eprintln!("Event is not a keyboard event: {:?}", event);
                         }
                     }
                 } else {

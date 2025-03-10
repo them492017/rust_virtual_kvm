@@ -7,7 +7,7 @@ use super::{
     crypto::Crypto,
     error::DynError,
     net::{Message, MessageWithNonce},
-    transport::{decrypt_and_deserialise_message, AsyncTransport},
+    transport::{decrypt_and_deserialise_message, Transport},
 };
 
 const BUFFER_LEN: usize = 256;
@@ -28,7 +28,7 @@ impl<T: Crypto> TokioUdpTransport<T> {
     }
 }
 
-impl<T: Crypto> AsyncTransport for TokioUdpTransport<T> {
+impl<T: Crypto> Transport for TokioUdpTransport<T> {
     async fn send_message(&mut self, message: Message) -> Result<(), DynError> {
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 

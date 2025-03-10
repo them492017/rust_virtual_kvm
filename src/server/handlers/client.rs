@@ -12,7 +12,7 @@ use crate::{
         error::DynError,
         net::Message,
         tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
-        transport::{AsyncTransportReader, AsyncTransportWriter},
+        transport::{TransportReader, TransportWriter},
     },
     server::{
         client::{Client, Connection},

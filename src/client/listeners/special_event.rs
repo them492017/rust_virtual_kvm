@@ -10,14 +10,13 @@ use crate::common::{
     error::DynError,
     net::Message,
     tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
-    transport::{AsyncTransportReader, AsyncTransportWriter},
+    transport::{TransportReader, TransportWriter},
 };
 
 pub async fn special_event_processor(
     transport: TokioTcpTransport<ChaCha20Poly1305>,
     cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
-    println!("Started special event listener");
     let virtual_keyboard = make_keyboard().expect("Could not create virtual keyboard");
 
     let (read_transport, write_transport) = transport.into_split();
@@ -50,7 +49,6 @@ pub async fn special_event_listener(
     cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     loop {
-        println!("Listening for message");
         tokio::select! {
             message = reader.receive_message() => {
                 if let Ok(event) = message {
@@ -67,11 +65,9 @@ pub async fn special_event_listener(
                                 release_all(&mut virtual_keyboard)?;
                                 sender.send(Message::TargetChangeResponse).await?;
                             }
-                            Message::Heartbeat => {
-                                println!("Received heartbeat");
-                            }
+                            Message::Heartbeat => {}
                             _ => {
-                                unimplemented!("Received unimplemented event")
+                                unimplemented!("Received unimplemented special event")
                             }
                         }
                 } else {
@@ -98,11 +94,9 @@ pub async fn special_event_sender(
     loop {
         tokio::select! {
             Some(message) = receiver.recv() => {
-                println!("Received message from channel");
                 writer.send_message(message).await?;
             },
             _ = tokio::time::sleep(timeout) => {
-                println!("Sending heartbeat");
                 writer.send_message(Message::Heartbeat).await?;
             },
             _ = cancellation_token.cancelled() => {

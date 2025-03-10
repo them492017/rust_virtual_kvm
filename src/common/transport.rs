@@ -4,15 +4,7 @@ use super::{
     net::{Message, MessageWithNonce},
 };
 
-// transport should just wrap the socket
-// should have another trait that handles bidirectional communication?
-// rename to Transport and ThreadedTransport or something
 pub trait Transport {
-    fn send_message(&mut self, message: Message) -> Result<(), DynError>;
-    fn receive_message(&mut self) -> Result<Message, DynError>;
-}
-
-pub trait AsyncTransport {
     fn send_message(
         &mut self,
         message: Message,
@@ -20,11 +12,11 @@ pub trait AsyncTransport {
     fn receive_message(&mut self) -> impl std::future::Future<Output = Result<Message, DynError>>;
 }
 
-pub trait AsyncTransportReader {
+pub trait TransportReader {
     fn receive_message(&mut self) -> impl std::future::Future<Output = Result<Message, DynError>>;
 }
 
-pub trait AsyncTransportWriter {
+pub trait TransportWriter {
     fn send_message(
         &mut self,
         message: Message,
@@ -37,19 +29,11 @@ pub fn decrypt_and_deserialise_message<T: Crypto>(
 ) -> Result<Message, DynError> {
     let message_with_nonce: MessageWithNonce = bincode::deserialize(bytes)?;
 
-    // println!("Encrypted bytes");
-    // print_debug_bytes(&message_with_nonce.message);
-    // println!("======================");
-
     let decrypted = if let Some(key) = &key {
         key.decrypt(message_with_nonce.message, message_with_nonce.nonce.into())?
     } else {
         message_with_nonce.message
     };
-
-    // println!("Decrypted bytes");
-    // print_debug_bytes(&decrypted);
-    // println!("======================");
 
     Ok(bincode::deserialize::<Message>(&decrypted)?)
 }
