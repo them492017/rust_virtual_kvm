@@ -52,11 +52,7 @@ pub async fn special_event_listener(
         tokio::select! {
             message = reader.receive_message() => {
                 if let Ok(event) = message {
-                        println!("{:?}", event);
                         match event {
-                            Message::InputEvent { event } => {
-                                println!("{:?}", event);
-                            }
                             Message::ClipboardChanged { content } => {
                                 println!("New clipboard item: [{:?}]", content);
                                 sender.send(Message::ExchangePubKeyResponse).await?; // TODO: temporary response

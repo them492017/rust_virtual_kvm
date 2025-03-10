@@ -24,7 +24,7 @@ use crate::{
 
 // TODO: refactor to a common location
 const HEARTBEAT_INTERVAL: u64 = 3;
-const NUM_RETRIES: u64 = 3;
+const MAX_RETRIES: u64 = 3;
 const CHANNEL_BUF_LEN: usize = 256;
 
 pub async fn handle_client(
@@ -83,7 +83,6 @@ async fn tcp_listener(
 ) -> Result<(), DynError> {
     loop {
         let message = listener.receive_message().await?;
-        println!("Received from TCP: {:?}", message);
         client_message_sender.send_client_message(message).await?;
     }
 }
@@ -96,35 +95,40 @@ async fn tcp_sender(
 ) -> Result<(), DynError> {
     let duration = Duration::from_secs(HEARTBEAT_INTERVAL);
     let mut fail_count = 0;
-    let num_retries = NUM_RETRIES;
 
     loop {
         tokio::select! {
             Some(message) = message_receiver.recv() => {
-                println!("Received message from channel");
-                sender.send_message(message).await?;
-                // TODO: figure out what to do about ? here...
-                // defeats the purpose of the failure count
-                fail_count = 0;
+                handle_send_result(sender.send_message(message).await, &mut fail_count, id, &client_message_sender).await?;
             },
             _ = tokio::time::sleep(duration) => {
-                println!("Sending heartbeat");
-                if let Err(err) = sender.send_message(Message::Heartbeat).await {
-                    fail_count += 1;
-                    println!(
-                        "Failed hearbeats {}/{} for client: {}",
-                        fail_count, num_retries, err
-                    );
-
-                    if fail_count >= num_retries {
-                        let message = ServerMessage::ClientDisconnect { id };
-                        client_message_sender.send_server_message(message).await?;
-                        return Err("Heartbeat failed".into());
-                    }
-                } else {
-                    fail_count = 0;
-                }
+                handle_send_result(sender.send_message(Message::Heartbeat).await, &mut fail_count, id, &client_message_sender).await?;
             }
         }
     }
+}
+
+async fn handle_send_result(
+    result: Result<(), DynError>,
+    fail_count: &mut u64,
+    id: Uuid,
+    client_message_sender: &ClientMessageSender,
+) -> Result<(), DynError> {
+    if let Err(err) = result {
+        *fail_count += 1;
+        eprintln!(
+            "Failed hearbeats {}/{} for client: {}",
+            fail_count, MAX_RETRIES, err
+        );
+
+        if *fail_count >= MAX_RETRIES {
+            let message = ServerMessage::ClientDisconnect { id };
+            client_message_sender.send_server_message(message).await?;
+            return Err("Heartbeat failed".into());
+        }
+    } else {
+        *fail_count = 0;
+    }
+
+    Ok(())
 }
