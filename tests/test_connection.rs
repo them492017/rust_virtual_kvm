@@ -4,6 +4,7 @@ use rust_virtual_kvm::{
     self, client::connection::Connection, common::error::DynError, server::server::start_listening,
 };
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 async fn connect_client(
     client_addr: SocketAddr,
@@ -23,9 +24,11 @@ async fn given_matching_ip_addresses_should_successfully_form_a_connection() {
     let (client_sender, _rx1) = mpsc::channel(10);
     let (client_message_sender, _rx2) = mpsc::channel(10);
 
+    let cancellation_token = CancellationToken::new();
+
     // When
     tokio::spawn(async move {
-        start_listening(server_addr, client_sender, client_message_sender).await
+        start_listening(server_addr, client_sender, client_message_sender, cancellation_token).await
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
     let response = connect_client(client_addr, server_addr).await;
