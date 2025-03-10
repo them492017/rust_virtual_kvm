@@ -145,9 +145,14 @@ async fn handle_client_message(
                 unimplemented!("Received unimplemented client message: {:?}", message);
             }
         },
-        InternalMessage::LocalMessage { message } => {
-            unimplemented!("Received local message: {:?}", message)
-        }
+        InternalMessage::LocalMessage { message } => match &message {
+            ServerMessage::ClientDisconnect { id } => {
+                state.disconnect_client(*id);
+            }
+            _ => {
+                unimplemented!("Unimplemented event type in client handler: {:?}", message)
+            }
+        },
     };
     Ok(())
 }
