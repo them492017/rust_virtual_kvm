@@ -117,7 +117,10 @@ pub mod test {
 
     use super::*;
 
-    pub fn test_state_fixture(client_channels: Vec<mpsc::Sender<Message>>, target_idx: Option<usize>) -> State<ChaCha20Poly1305> {
+    pub fn test_state_fixture(
+        client_channels: Vec<mpsc::Sender<Message>>,
+        target_idx: Option<usize>,
+    ) -> State<ChaCha20Poly1305> {
         let mut state = State::default();
         client_channels.into_iter().for_each(|channel| {
             state.add_client(test_client_fixture(channel));

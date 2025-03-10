@@ -53,8 +53,7 @@ pub async fn special_event_listener(
         println!("Listening for message");
         tokio::select! {
             message = reader.receive_message() => {
-                match message {
-                    Ok(event) => {
+                if let Ok(event) = message {
                         println!("{:?}", event);
                         match event {
                             Message::InputEvent { event } => {
@@ -62,7 +61,7 @@ pub async fn special_event_listener(
                             }
                             Message::ClipboardChanged { content } => {
                                 println!("New clipboard item: [{:?}]", content);
-                                sender.send(Message::Ack).await?; // TODO: temporary response
+                                sender.send(Message::ExchangePubKeyResponse).await?; // TODO: temporary response
                             }
                             Message::TargetChangeNotification => {
                                 release_all(&mut virtual_keyboard)?;
@@ -75,13 +74,12 @@ pub async fn special_event_listener(
                                 unimplemented!("Received unimplemented event")
                             }
                         }
-                    }
-                    Err(err) => {
-                        println!(
-                            "An error has occured when listening to TCP messages: {}",
-                            err
-                        );
-                    }
+                } else {
+                    eprintln!(
+                        "An error has occured when listening to TCP messages: {:?}",
+                        message.as_ref().err()
+                    );
+                    return Err(message.err().unwrap())
                 }
             },
             _ = cancellation_token.cancelled() => {

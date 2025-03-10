@@ -28,7 +28,7 @@ pub enum Message {
     ClipboardChanged { content: String }, // TODO: content could be an image
     ClientInit { addr: SocketAddr },
     ExchangePubKey { pub_key: PublicKey },
-    Ack,
+    ExchangePubKeyResponse,
     Handshake,
     Heartbeat,
 }
@@ -48,7 +48,7 @@ impl fmt::Display for Message {
             Message::ExchangePubKey { pub_key } => {
                 write!(f, "ExchangePubKey: pub_key = {:?}", pub_key)
             }
-            Message::Ack => write!(f, "Ack"),
+            Message::ExchangePubKeyResponse => write!(f, "Ack"),
             Message::Handshake => write!(f, "Handshake"),
             Message::Heartbeat => write!(f, "Heartbeat"),
         }

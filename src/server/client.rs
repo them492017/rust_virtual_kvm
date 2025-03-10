@@ -80,7 +80,9 @@ impl Connection<ChaCha20Poly1305> for Client<ChaCha20Poly1305> {
             }
         };
 
-        transport.send_message(Message::Ack).await?;
+        transport
+            .send_message(Message::ExchangePubKeyResponse)
+            .await?;
         println!("Sent ack to client");
 
         let cipher = {
@@ -164,7 +166,7 @@ pub mod test {
             id: Uuid::new_v4(),
             connected: true,
             address: "127.0.0.1:34567".parse().unwrap(),
-            key: ChaCha20Poly1305::new_from_slice(&[0;32]).unwrap(),
+            key: ChaCha20Poly1305::new_from_slice(&[0; 32]).unwrap(),
             message_sender,
             pending_target_change_responses: 0,
             pending_messages: Vec::new().into(),

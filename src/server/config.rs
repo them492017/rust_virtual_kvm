@@ -11,9 +11,5 @@ pub fn init() -> Config {
     let keyboard = pick_device("keyboard");
     let mouse = pick_device("mouse");
 
-    Config {
-        keyboard,
-        mouse,
-    }
+    Config { keyboard, mouse }
 }
-

@@ -1,7 +1,8 @@
 use std::{io, thread, time::Duration};
 
 use evdev::{
-    uinput::{VirtualDevice, VirtualDeviceBuilder}, AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType
+    uinput::{VirtualDevice, VirtualDeviceBuilder},
+    AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType,
 };
 
 use super::error::DynError;

@@ -54,8 +54,6 @@ impl Connection {
                 return Err("Invalid response from server. Expected public key exchange.".into());
             };
 
-        // TODO: first we should verify pub key signature
-
         // generate public key
         let secret = EphemeralSecret::random_from_rng(OsRng);
         let public_key = PublicKey::from(&secret);
@@ -71,7 +69,7 @@ impl Connection {
 
         // wait for ack
         println!("Waiting for server ack");
-        if let Message::Ack = transport.receive_message().await? {
+        if let Message::ExchangePubKeyResponse = transport.receive_message().await? {
             println!("Received ack from server");
         } else {
             return Err("Server did not acknowledge client public key".into());
@@ -79,7 +77,7 @@ impl Connection {
 
         // generate cipher
         let cipher = {
-            // extract this into a trait method if supporting different keys
+            // extract this into a trait method if supporting different types of keys
             let shared_secret = secret.diffie_hellman(&server_pub_key);
             if !shared_secret.was_contributory() {
                 return Err("Shared secret was not contributory".into());

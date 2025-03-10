@@ -101,7 +101,9 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
+            let response = state
+                .change_target(new_target_idx, &mut grab_request_sender)
+                .await;
             tokio::task::yield_now().await;
 
             // Then
@@ -120,7 +122,9 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
+            let response = state
+                .change_target(new_target_idx, &mut grab_request_sender)
+                .await;
             tokio::task::yield_now().await;
 
             // Then
@@ -150,7 +154,9 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
+            let response = state
+                .change_target(new_target_idx, &mut grab_request_sender)
+                .await;
             tokio::task::yield_now().await;
 
             // Then
@@ -178,7 +184,9 @@ mod test {
             let mut state = test_state_fixture(client_message_senders, old_target_idx);
 
             // When
-            let response = state.change_target(new_target_idx, &mut grab_request_sender).await;
+            let response = state
+                .change_target(new_target_idx, &mut grab_request_sender)
+                .await;
             tokio::task::yield_now().await;
 
             // Then

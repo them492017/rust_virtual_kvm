@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
+use rust_virtual_kvm::client;
 use rust_virtual_kvm::common::error::DynError;
 use rust_virtual_kvm::server;
-use rust_virtual_kvm::client;
 use rust_virtual_kvm::ui;
 
 const WELCOME_STRING: &str = r#"

@@ -47,39 +47,36 @@ async fn input_event_processor(
         println!("Listening for message");
         tokio::select! {
             message = transport.receive_message() => {
-                match message {
-                    Ok(event) => {
-                        println!("{:?}", event);
-                        match event {
-                            Message::InputEvent { event } => {
-                                println!("{:?}", event);
-                                let input_event: InputEvent = event.into();
-                                match input_event.event_type() {
-                                    EventType::KEY => {
-                                        println!("Emitting key event: {:?}", input_event);
-                                        virtual_keyboard.emit(&[input_event]).unwrap();
-                                    }
-                                    EventType::RELATIVE => {
-                                        println!("Emitting mouse event: {:?}", input_event);
-                                        virtual_mouse.emit(&[input_event]).unwrap();
-                                    }
-                                    _ => {
-                                        println!("Unimplemented event type");
-                                    }
+                if let Ok(event) = message {
+                    println!("{:?}", event);
+                    match event {
+                        Message::InputEvent { event } => {
+                            println!("{:?}", event);
+                            let input_event: InputEvent = event.into();
+                            match input_event.event_type() {
+                                EventType::KEY => {
+                                    println!("Emitting key event: {:?}", input_event);
+                                    virtual_keyboard.emit(&[input_event]).unwrap();
+                                }
+                                EventType::RELATIVE => {
+                                    println!("Emitting mouse event: {:?}", input_event);
+                                    virtual_mouse.emit(&[input_event]).unwrap();
+                                }
+                                _ => {
+                                    println!("Unimplemented event type");
                                 }
                             }
-                            _ => {
-                                println!("Event is not a keyboard event: {:?}", event);
-                            }
+                        }
+                        _ => {
+                            println!("Event is not a keyboard event: {:?}", event);
                         }
                     }
-                    Err(err) => {
-                        println!(
-                            "An error has occured when listening to UDP messages:\n{}",
-                            err
-                        );
-                        unimplemented!("error handling for UDP listener failing not implememnted")
-                    }
+                } else {
+                    eprintln!(
+                        "An error has occured when listening to UDP messages: {:?}",
+                        message.as_ref().err()
+                    );
+                    return Err(message.err().unwrap())
                 }
             },
             _ = cancellation_token.cancelled() => {
