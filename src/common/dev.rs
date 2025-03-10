@@ -65,9 +65,7 @@ impl InputDevice for Device {
 
 pub fn release_all<T: InputDevice>(device: &mut T) -> Result<(), DynError> {
     // TODO: consider device.supported_keys()
-    println!("Releasing all keys");
     ALL_KEYS.iter().for_each(|key| {
-        println!("Releasing {key:?}");
         device
             .emit(&[InputEvent::new(EventType::KEY, key.code(), 0)])
             .unwrap();

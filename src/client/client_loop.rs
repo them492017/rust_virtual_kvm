@@ -18,7 +18,7 @@ pub async fn run(server_addr: SocketAddr, client_addr: SocketAddr) -> Result<(),
         let transport = connection
             .connect(client_addr, server_addr)
             .await
-            .inspect_err(|err| println!("Could not reconnect: {}", err));
+            .inspect_err(|err| eprintln!("Could not connect to server: {}", err));
 
         if connection.is_connected && transport.is_ok() {
             retry_seconds = INITIAL_RETRY_SECONDS;
@@ -34,7 +34,7 @@ pub async fn run(server_addr: SocketAddr, client_addr: SocketAddr) -> Result<(),
             tokio::select! {
                 result = input_event_processor => {
                     match result {
-                        Ok(Ok(())) => println!("Input event processor finished gracefully"),
+                        Ok(Ok(())) => {},
                         Ok(Err(err)) => eprintln!("Input event processor exited with error: {}", err),
                         Err(err) => {
                             eprintln!("Input event processor panicked: {}", err);
@@ -44,7 +44,7 @@ pub async fn run(server_addr: SocketAddr, client_addr: SocketAddr) -> Result<(),
                 }
                 result = special_event_processor => {
                     match result {
-                        Ok(Ok(())) => println!("Special event processor finished gracefully"),
+                        Ok(Ok(())) => {},
                         Ok(Err(err)) => eprintln!("Special event processor exited with error: {}", err),
                         Err(err) => {
                             eprintln!("Special event processor panicked: {}", err);
@@ -58,7 +58,7 @@ pub async fn run(server_addr: SocketAddr, client_addr: SocketAddr) -> Result<(),
             tokio::time::sleep(Duration::from_secs(retry_seconds)).await;
             retry_seconds = min(retry_seconds * RETRY_MUTLIPLIER, MAX_RETRY_SECONDS);
             println!(
-                "Could not connect to client. Waiting {} seconds",
+                "Could not connect to server. Retrying in {} seconds",
                 retry_seconds
             );
         }
