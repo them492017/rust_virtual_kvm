@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use tokio::sync::{broadcast, mpsc};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     common::error::DynError,
@@ -14,15 +15,15 @@ use crate::{
 
 pub async fn run(server_addr: SocketAddr) -> Result<(), DynError> {
     let Config { keyboard, mouse } = init();
-    let (event_tx, event_rx) = mpsc::channel(32);
+    let (event_tx1, event_rx) = mpsc::channel(32);
+    let event_tx2 = event_tx1.clone();
     let (client_tx, client_rx) = mpsc::channel(32);
     let (client_message_tx, client_message_rx) = mpsc::channel(32);
-    let (grab_request_tx, _) = broadcast::channel(32);
+    let (grab_request_tx, grab_request_rx1) = broadcast::channel(32);
+    let grab_request_rx2 = grab_request_tx.subscribe();
+    let cancellation_token = CancellationToken::new();
 
-    // TODO: rename
-    let rx1 = grab_request_tx.subscribe();
-    let rx2 = grab_request_tx.subscribe();
-
+    let cancellation_token_clone = cancellation_token.clone();
     let event_processor = tokio::spawn(async move {
         event_processor(
             server_addr,
@@ -30,20 +31,31 @@ pub async fn run(server_addr: SocketAddr) -> Result<(), DynError> {
             client_message_rx,
             client_rx,
             grab_request_tx,
+            cancellation_token_clone,
         )
         .await
     });
 
-    // TODO: rename
-    let tx = event_tx.clone();
-    let kbd_listener = tokio::spawn(async { start_device_listener(keyboard, tx, rx1).await });
-    let tx = event_tx.clone();
-    let mouse_listener = tokio::spawn(async { start_device_listener(mouse, tx, rx2).await });
+    let cancellation_token_clone = cancellation_token.clone();
+    let kbd_listener = tokio::spawn(async {
+        start_device_listener(
+            keyboard,
+            event_tx1,
+            grab_request_rx1,
+            cancellation_token_clone,
+        )
+        .await
+    });
+    let cancellation_token_clone = cancellation_token.clone();
+    let mouse_listener = tokio::spawn(async {
+        start_device_listener(mouse, event_tx2, grab_request_rx2, cancellation_token_clone).await
+    });
 
     println!("Starting server");
     let client_tx_clone = client_tx.clone();
+    let cancellation_token_clone = cancellation_token.clone();
     tokio::select! {
-        result = start_listening(server_addr, client_tx_clone, client_message_tx) => {
+        result = start_listening(server_addr, client_tx_clone, client_message_tx, cancellation_token_clone) => {
             match result {
                 Ok(()) => println!("Server closed gracefully"),
                 Err(err) => eprintln!("Server exited with error: {}", err),
@@ -72,6 +84,7 @@ pub async fn run(server_addr: SocketAddr) -> Result<(), DynError> {
         },
     }
     println!("Shutting down server");
+    cancellation_token.cancel();
 
-    todo!("Add shutdown tokens to force shutdown");
+    Ok(())
 }

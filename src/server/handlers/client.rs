@@ -5,6 +5,7 @@ use tokio::{
     net::TcpStream,
     sync::mpsc::{self, Receiver, Sender},
 };
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{
@@ -31,6 +32,7 @@ pub async fn handle_client(
     stream: TcpStream,
     client_sender: Sender<Client<ChaCha20Poly1305>>,
     client_message_sender: Sender<InternalMessage>,
+    cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     let mut transport = TokioTcpTransport::new(stream);
     let (message_sender, message_receiver) = mpsc::channel(CHANNEL_BUF_LEN);
@@ -40,7 +42,14 @@ pub async fn handle_client(
     let id = client.id;
     client_sender.send(client).await?;
 
-    process_events(id, transport, message_receiver, client_message_sender).await
+    process_events(
+        id,
+        transport,
+        message_receiver,
+        client_message_sender,
+        cancellation_token,
+    )
+    .await
 }
 
 async fn process_events(
@@ -48,6 +57,7 @@ async fn process_events(
     transport: TokioTcpTransport<ChaCha20Poly1305>,
     message_receiver: Receiver<Message>,
     client_message_sender: Sender<InternalMessage>,
+    cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     let (reader_transport, writer_transport) = transport.into_split();
 
@@ -73,6 +83,9 @@ async fn process_events(
         },
         result = sender => {
             return result?
+        },
+        _ = cancellation_token.cancelled() => {
+            return Ok(())
         },
     }
 }

@@ -5,6 +5,7 @@ use tokio::{
     net::UdpSocket,
     sync::{broadcast, mpsc},
 };
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::common::{error::DynError, net::Message};
@@ -32,6 +33,7 @@ pub async fn event_processor(
     mut client_message_receiver: mpsc::Receiver<InternalMessage>,
     mut client_receiver: mpsc::Receiver<Client<ChaCha20Poly1305>>,
     mut grab_request_sender: broadcast::Sender<bool>,
+    cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     // device_receiver receives incoming messages from device listeners
     // message is either of type Message or SpecialEvent
@@ -77,6 +79,9 @@ pub async fn event_processor(
                     }
                 }
             },
+            _ = cancellation_token.cancelled() => {
+                return Ok(())
+            }
         }
     }
 }

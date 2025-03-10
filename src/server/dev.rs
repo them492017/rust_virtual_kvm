@@ -1,5 +1,6 @@
 use evdev::InputEventKind;
 use tokio::sync::{broadcast, mpsc};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     common::{dev::release_all, error::DynError, net::Message},
@@ -14,6 +15,7 @@ pub async fn start_device_listener(
     device: evdev::Device,
     event_sender: mpsc::Sender<InternalMessage>,
     mut grab_request_receiver: broadcast::Receiver<bool>,
+    cancellation_token: CancellationToken,
 ) -> Result<(), DynError> {
     println!(
         "Starting device listener for device: {}",
@@ -53,7 +55,11 @@ pub async fn start_device_listener(
                         panic!();
                     }
                 }
-            }
+            },
+            _ = cancellation_token.cancelled() => {
+                release_all(device_stream.device_mut())?;
+                return Ok(())
+            },
         }
     }
 }
