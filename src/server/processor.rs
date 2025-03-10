@@ -62,7 +62,7 @@ pub async fn event_processor(
             },
             msg = client_message_receiver.recv() => {
                 if let Some(message) = msg {
-                    handle_client_message(message, &mut state, &mut transport).await?;
+                    handle_client_message(message, &mut state, &mut transport, &mut grab_request_sender).await?;
                 } else {
                     eprintln!("Client receiver was closed");
                     return Err("Client receiver was closed".into());
@@ -117,7 +117,7 @@ async fn handle_device_message(
             // forward special event to client handler to be sent over tcp
             match &message {
                 ServerMessage::ClientDisconnect { id } => {
-                    state.disconnect_client(*id);
+                    state.disconnect_client(*id, grab_request_sender).await?;
                 }
                 ServerMessage::Cycle => {
                     state.cycle_target(grab_request_sender).await?;
@@ -132,6 +132,7 @@ async fn handle_client_message(
     msg: InternalMessage,
     state: &mut State<ChaCha20Poly1305>,
     transport: &mut InputEventTransport,
+    grab_request_sender: &mut broadcast::Sender<bool>,
 ) -> Result<(), DynError> {
     match msg {
         InternalMessage::ClientMessage { message, sender } => match &message {
@@ -152,10 +153,10 @@ async fn handle_client_message(
         },
         InternalMessage::LocalMessage { message } => match &message {
             ServerMessage::ClientDisconnect { id } => {
-                state.disconnect_client(*id);
+                state.disconnect_client(*id, grab_request_sender).await?;
             }
-            _ => {
-                unimplemented!("Unimplemented event type in client handler: {:?}", message)
+            ServerMessage::Cycle => {
+                state.cycle_target(grab_request_sender).await?;
             }
         },
     };

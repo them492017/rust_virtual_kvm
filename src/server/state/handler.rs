@@ -81,11 +81,16 @@ impl<T: Crypto + Clone> State<T> {
         Ok(())
     }
 
-    pub fn disconnect_client(&mut self, id: Uuid) {
+    pub async fn disconnect_client(&mut self, id: Uuid, grab_request_sender: &mut broadcast::Sender<bool>) -> Result<(), DynError> {
         println!("Client {} disconnected", id);
         self.get_client_by_id_mut(id)
             .expect("Client with given id should exist")
             .connected = false;
+        // swap target to server if target just disconnected
+        if !self.get_target().map(|tgt| tgt.connected).unwrap_or(false) {
+            self.change_target(None, grab_request_sender).await?;
+        }
+        Ok(())
     }
 }
 
