@@ -46,10 +46,8 @@ async fn input_event_processor(
         tokio::select! {
             message = transport.receive_message() => {
                 if let Ok(event) = message {
-                    println!("{:?}", event);
                     match event {
                         Message::InputEvent { event } => {
-                            println!("{:?}", event);
                             let input_event: InputEvent = event.into();
                             match input_event.event_type() {
                                 EventType::KEY => {

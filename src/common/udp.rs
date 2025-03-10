@@ -56,6 +56,6 @@ impl<T: Crypto> Transport for TokioUdpTransport<T> {
         }
 
         decrypt_and_deserialise_message(&buf[..bytes_read], &self.symmetric_key)
-            .inspect_err(|e| println!("error in decrypt+deserialise: {}", e))
+            .inspect_err(|e| eprintln!("Error while decrypting and deserialising: {}", e))
     }
 }
