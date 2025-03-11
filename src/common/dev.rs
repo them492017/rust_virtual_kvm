@@ -2,7 +2,7 @@ use std::{io, thread, time::Duration};
 
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
-    AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType,
+    AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
 };
 
 use super::error::DynError;
@@ -51,26 +51,13 @@ pub trait InputDevice {
     fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()>;
 }
 
-impl InputDevice for VirtualDevice {
-    fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()> {
-        self.emit(messages)
-    }
-}
-
-impl InputDevice for Device {
-    fn emit(&mut self, messages: &[InputEvent]) -> io::Result<()> {
-        self.send_events(messages)
-    }
-}
-
-pub fn release_all<T: InputDevice>(device: &mut T) -> Result<(), DynError> {
-    // TODO: consider device.supported_keys()
+pub fn release_all(device: &mut VirtualDevice) -> Result<(), DynError> {
     ALL_KEYS.iter().for_each(|key| {
         device
-            .emit(&[InputEvent::new(EventType::KEY, key.code(), 0)])
+            .emit(dbg!(&[InputEvent::new(EventType::KEY, key.code(), 0)]))
             .unwrap();
+        thread::sleep(Duration::from_millis(40));
     });
-
     Ok(())
 }
 

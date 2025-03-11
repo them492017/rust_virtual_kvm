@@ -31,7 +31,7 @@ pub async fn start_listening(
             )
             .await
             {
-                println!("Error handling client: {}", err);
+                eprintln!("Error handling client: {}", err);
             }
         });
     }

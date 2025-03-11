@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::net::SocketAddr;
 
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
+use thiserror::Error;
 use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
 use x25519_dalek::{EphemeralSecret, PublicKey};
@@ -10,9 +11,17 @@ use crate::common::{
     crypto::Crypto, error::DynError, net::Message, tcp::TokioTcpTransport, transport::Transport,
 };
 
-use super::input_event_transport::InputEventTransport;
+use super::input_event_transport::{InputEventError, InputEventTransport};
 
 const RING_BUFFER_LEN: usize = 1024;
+
+#[derive(Debug, Error)]
+pub enum ClientError {
+    #[error("Client not ready to receive messages")]
+    NotReady,
+    #[error("Input event transport error")]
+    TransportError(#[from] InputEventError),
+}
 
 pub trait Connection<T: Crypto>: Sized {
     fn connect(
@@ -127,9 +136,9 @@ impl<T: Crypto> Client<T> {
     pub async fn flush_pending_messages(
         &mut self,
         transport: &mut InputEventTransport,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), ClientError> {
         if !self.can_receive() {
-            return Err("Client has not yet responded to all pending change requests".into());
+            return Err(ClientError::NotReady);
         }
         while let Some(message) = self.pending_messages.pop_front() {
             transport

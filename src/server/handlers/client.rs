@@ -79,13 +79,13 @@ async fn process_events(
 
     tokio::select! {
         result = listener => {
-            return result?
+            result?
         },
         result = sender => {
-            return result?
+            result?
         },
         _ = cancellation_token.cancelled() => {
-            return Ok(())
+            Ok(())
         },
     }
 }
@@ -112,10 +112,20 @@ async fn tcp_sender(
     loop {
         tokio::select! {
             Some(message) = message_receiver.recv() => {
-                handle_send_result(sender.send_message(message).await, &mut fail_count, id, &client_message_sender).await?;
+                handle_send_result(
+                    sender.send_message(message).await,
+                    &mut fail_count,
+                    id,
+                    &client_message_sender,
+                ).await?;
             },
             _ = tokio::time::sleep(duration) => {
-                handle_send_result(sender.send_message(Message::Heartbeat).await, &mut fail_count, id, &client_message_sender).await?;
+                handle_send_result(
+                    sender.send_message(Message::Heartbeat).await,
+                    &mut fail_count,
+                    id,
+                    &client_message_sender,
+                ).await?;
             }
         }
     }

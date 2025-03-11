@@ -1,9 +1,11 @@
 use uuid::Uuid;
 
 use crate::{
-    common::{crypto::Crypto, error::DynError},
+    common::crypto::Crypto,
     server::client::Client,
 };
+
+use super::error::StateHandlerError;
 
 #[allow(dead_code)]
 pub struct State<T: Crypto> {
@@ -35,16 +37,16 @@ impl<T: Crypto> State<T> {
         self.clients.len()
     }
 
-    pub fn get_client(&self, client_idx: usize) -> Result<&Client<T>, DynError> {
+    pub fn get_client(&self, client_idx: usize) -> Result<&Client<T>, StateHandlerError> {
         if client_idx >= self.clients.len() {
-            return Err("Index is out of bounds".into());
+            return Err(StateHandlerError::NotFound);
         }
         Ok(&self.clients[client_idx])
     }
 
-    pub fn get_client_mut(&mut self, client_idx: usize) -> Result<&mut Client<T>, DynError> {
+    pub fn get_client_mut(&mut self, client_idx: usize) -> Result<&mut Client<T>, StateHandlerError> {
         if client_idx >= self.clients.len() {
-            return Err("Index is out of bounds".into());
+            return Err(StateHandlerError::NotFound);
         }
         Ok(&mut self.clients[client_idx])
     }
@@ -61,39 +63,38 @@ impl<T: Crypto> State<T> {
         &mut self,
         client_idx: usize,
         new_client: Client<T>,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), StateHandlerError> {
         if client_idx >= self.clients.len() {
-            return Err("Index is out of bounds".into());
+            return Err(StateHandlerError::NotFound);
         }
         self.clients[client_idx] = new_client;
         Ok(())
     }
 
-    pub fn set_target(&mut self, idx: Option<usize>) -> Result<(), DynError> {
+    pub fn set_target(&mut self, idx: Option<usize>) -> Result<(), StateHandlerError> {
         if let Some(i) = idx {
             if i >= self.clients.len() {
-                // TODO: type this error
-                return Err("Target index is out of bounds".into());
+                return Err(StateHandlerError::NotFound);
             }
         }
         self.target_idx = idx;
         Ok(())
     }
 
-    pub async fn mark_disconnected(&mut self, client_idx: usize) -> Result<(), DynError> {
+    pub async fn mark_disconnected(&mut self, client_idx: usize) -> Result<(), StateHandlerError> {
         if client_idx >= self.clients.len() {
-            return Err("Index is out of bounds".into());
+            return Err(StateHandlerError::NotFound);
         }
         self.clients[client_idx].connected = false;
         Ok(())
     }
 
-    pub async fn mark_disconnected_by_id(&mut self, id: Uuid) -> Result<(), DynError> {
+    pub async fn mark_disconnected_by_id(&mut self, id: Uuid) -> Result<(), StateHandlerError> {
         if let Some(client) = self.get_client_by_id_mut(id) {
             client.connected = false;
             Ok(())
         } else {
-            Err(format!("Could not find client with id {id}").into())
+            Err(StateHandlerError::NotFound)
         }
     }
 }

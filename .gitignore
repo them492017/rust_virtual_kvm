@@ -1,6 +1,7 @@
 /target
 result-bin
 result
+**/*.log
 
 
 # Added by cargo

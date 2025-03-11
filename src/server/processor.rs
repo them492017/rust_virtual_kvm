@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use chacha20poly1305::ChaCha20Poly1305;
+use thiserror::Error;
 use tokio::{
     net::UdpSocket,
     sync::{broadcast, mpsc},
@@ -8,12 +9,32 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::common::{error::DynError, net::Message};
+use crate::common::net::Message;
 
 use super::{
-    client::Client, input_event_transport::InputEventTransport, server_message::ServerMessage,
-    state::state::State,
+    client::Client,
+    input_event_transport::{InputEventError, InputEventTransport},
+    server_message::ServerMessage,
+    state::{error::StateHandlerError, state::State},
 };
+
+#[derive(Debug, Error)]
+pub enum ProcessorError {
+    #[error("Device message listener channel closed")]
+    DeviceChannelClosed,
+    #[error("Client message listener channel closed")]
+    ClientReceiverChannelClosed,
+    #[error("New client receiver channel closed")]
+    ClientListenerChannelClosed,
+    #[error("Invalid argument")]
+    InvalidArgument,
+    #[error("State error")]
+    StateError(#[from] StateHandlerError),
+    #[error("Input event transport error")]
+    InputEventError(#[from] InputEventError),
+    #[error("IO error")]
+    IOError(#[from] std::io::Error),
+}
 
 #[derive(Debug)]
 pub enum InternalMessage {
@@ -34,7 +55,7 @@ pub async fn event_processor(
     mut client_receiver: mpsc::Receiver<Client<ChaCha20Poly1305>>,
     mut grab_request_sender: broadcast::Sender<bool>,
     cancellation_token: CancellationToken,
-) -> Result<(), DynError> {
+) -> Result<(), ProcessorError> {
     // device_receiver receives incoming messages from device listeners
     // message is either of type Message or SpecialEvent
     //
@@ -46,8 +67,6 @@ pub async fn event_processor(
     // back to the global processor
     let mut state: State<ChaCha20Poly1305> = State::default();
     let socket = UdpSocket::bind(server_addr).await?;
-    // let mut transport: TargetlessUdpTransport<ChaCha20Poly1305> =
-    //     TargetlessUdpTransport::new(socket, server_addr);
     let mut transport = InputEventTransport::new(socket);
 
     loop {
@@ -57,7 +76,7 @@ pub async fn event_processor(
                     handle_device_message(message, &mut state, &mut transport, &mut grab_request_sender).await?;
                 } else {
                     eprintln!("Event processor receiver was closed");
-                    return Err("Event processor receiver was closed".into());
+                    return Err(ProcessorError::DeviceChannelClosed);
                 }
             },
             msg = client_message_receiver.recv() => {
@@ -65,7 +84,7 @@ pub async fn event_processor(
                     handle_client_message(message, &mut state, &mut transport, &mut grab_request_sender).await?;
                 } else {
                     eprintln!("Client receiver was closed");
-                    return Err("Client receiver was closed".into());
+                    return Err(ProcessorError::ClientListenerChannelClosed);
                 }
             },
             client = client_receiver.recv() => {
@@ -75,11 +94,12 @@ pub async fn event_processor(
                     },
                     None => {
                         eprintln!("Client receiver was closed");
-                        return Err("Client receiver was closed".into());
+                        return Err(ProcessorError::ClientReceiverChannelClosed);
                     }
                 }
             },
             _ = cancellation_token.cancelled() => {
+                eprintln!("Event processing was cancelled");
                 return Ok(())
             }
         }
@@ -91,7 +111,7 @@ async fn handle_device_message(
     state: &mut State<ChaCha20Poly1305>,
     transport: &mut InputEventTransport,
     grab_request_sender: &mut broadcast::Sender<bool>,
-) -> Result<(), DynError> {
+) -> Result<(), ProcessorError> {
     match msg {
         InternalMessage::ClientMessage { message, .. } => {
             // send input event to correct client over udp
@@ -133,7 +153,7 @@ async fn handle_client_message(
     state: &mut State<ChaCha20Poly1305>,
     transport: &mut InputEventTransport,
     grab_request_sender: &mut broadcast::Sender<bool>,
-) -> Result<(), DynError> {
+) -> Result<(), ProcessorError> {
     match msg {
         InternalMessage::ClientMessage { message, sender } => match &message {
             Message::Heartbeat => {}
@@ -141,8 +161,7 @@ async fn handle_client_message(
                 state.clipboard_contents = Some(content.to_string()); // TODO: handle race condition...
             }
             Message::TargetChangeResponse => {
-                let sender =
-                    sender.ok_or::<DynError>("No sender provided for client message".into())?;
+                let sender = sender.ok_or(ProcessorError::InvalidArgument)?;
                 state
                     .handle_change_target_response(sender, transport)
                     .await?;
@@ -152,9 +171,10 @@ async fn handle_client_message(
             }
         },
         InternalMessage::LocalMessage { message } => match &message {
-            ServerMessage::ClientDisconnect { id } => {
-                state.disconnect_client(*id, grab_request_sender).await?;
-            }
+            ServerMessage::ClientDisconnect { id } => state
+                .disconnect_client(*id, grab_request_sender)
+                .await
+                .inspect_err(|err| eprintln!("Error while disconnecting client: {}", err))?,
             ServerMessage::Cycle => {
                 state.cycle_target(grab_request_sender).await?;
             }

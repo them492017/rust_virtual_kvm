@@ -32,4 +32,4 @@ impl Default for KeyboardState {
     }
 }
 
-pub const CYCLE_TARGET: [Key; 3] = [Key::KEY_LEFTCTRL, Key::KEY_LEFTSHIFT, Key::KEY_K];
+pub const CYCLE_TARGET: [Key; 3] = [Key::KEY_LEFTCTRL, Key::KEY_LEFTSHIFT, Key::KEY_H];

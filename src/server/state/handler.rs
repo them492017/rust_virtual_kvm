@@ -1,25 +1,25 @@
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::{
-    common::{crypto::Crypto, error::DynError},
-    server::input_event_transport::InputEventTransport,
-};
+use crate::{common::crypto::Crypto, server::input_event_transport::InputEventTransport};
 
-use super::state::State;
+use super::{error::StateHandlerError, state::State};
 
 impl<T: Crypto + Clone> State<T> {
     pub async fn change_target(
         &mut self,
         new_idx: Option<usize>,
         grab_request_sender: &mut broadcast::Sender<bool>,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), StateHandlerError> {
         println!("Changing target index to {:?}", new_idx);
         let prev = self.get_target().is_none();
         let prev_idx = self.get_target_idx();
         self.set_target(new_idx)?;
         if let Some(idx) = prev_idx {
-            self.send_change_target_notification(idx).await?;
+            match self.send_change_target_notification(idx).await {
+                Ok(()) | Err(StateHandlerError::ClientDisconnected) => {}
+                Err(err) => return Err(err),
+            }
         }
         let curr = self.get_target().is_none();
         if prev && !curr {
@@ -36,7 +36,7 @@ impl<T: Crypto + Clone> State<T> {
     pub async fn cycle_target(
         &mut self,
         grab_request_sender: &mut broadcast::Sender<bool>,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), StateHandlerError> {
         let len = self.get_num_clients();
         let prev_idx = self.get_target_idx().unwrap_or(len);
 
@@ -49,14 +49,22 @@ impl<T: Crypto + Clone> State<T> {
                         .map(|client| client.connected)
                         .unwrap_or(false)
             })
-            .ok_or_else(|| -> DynError { "Could not find target to swap to".into() })
+            .ok_or_else(|| StateHandlerError::NotFound)
             .map(|idx| if idx == len { None } else { Some(idx) })?;
 
         self.change_target(target_idx, grab_request_sender).await
     }
 
-    async fn send_change_target_notification(&mut self, idx: usize) -> Result<(), DynError> {
+    async fn send_change_target_notification(
+        &mut self,
+        idx: usize,
+    ) -> Result<(), StateHandlerError> {
         let client = self.get_client_mut(idx)?;
+
+        if !client.connected {
+            return Err(StateHandlerError::ClientDisconnected);
+        }
+
         println!("Sending target change notif to client at index {}", idx);
         client.pending_target_change_responses += 1;
         client
@@ -70,10 +78,10 @@ impl<T: Crypto + Clone> State<T> {
         &mut self,
         id: Uuid,
         transport: &mut InputEventTransport,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), StateHandlerError> {
         let client = self
             .get_client_by_id_mut(id)
-            .ok_or::<DynError>("Not found error".into())?;
+            .ok_or(StateHandlerError::NotFound)?;
         client.pending_target_change_responses -= 1;
         if client.pending_target_change_responses == 0 {
             client.flush_pending_messages(transport).await?;
@@ -81,7 +89,11 @@ impl<T: Crypto + Clone> State<T> {
         Ok(())
     }
 
-    pub async fn disconnect_client(&mut self, id: Uuid, grab_request_sender: &mut broadcast::Sender<bool>) -> Result<(), DynError> {
+    pub async fn disconnect_client(
+        &mut self,
+        id: Uuid,
+        grab_request_sender: &mut broadcast::Sender<bool>,
+    ) -> Result<(), StateHandlerError> {
         println!("Client {} disconnected", id);
         self.get_client_by_id_mut(id)
             .expect("Client with given id should exist")

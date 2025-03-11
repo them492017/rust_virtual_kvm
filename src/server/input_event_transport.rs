@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use chacha20poly1305::Nonce;
+use thiserror::Error;
 use tokio::net::UdpSocket;
 
 use crate::common::{
@@ -8,6 +9,16 @@ use crate::common::{
     error::DynError,
     net::{Message, MessageWithNonce},
 };
+
+#[derive(Debug, Error)]
+pub enum InputEventError {
+    #[error("Encryption error")]
+    EncryptionError(#[from] DynError), // should be opaque
+    #[error("Serialisation error")]
+    BincodeError(#[from] bincode::Error),
+    #[error("IO error")]
+    IOError(#[from] std::io::Error),
+}
 
 pub struct InputEventTransport {
     socket: UdpSocket,
@@ -23,7 +34,7 @@ impl InputEventTransport {
         message: Message,
         address: SocketAddr,
         encryptor: Option<T>,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), InputEventError> {
         let encoded_message: Vec<u8> = bincode::serialize(&message)?;
 
         let (encrypted, nonce) = if let Some(encryptor) = encryptor {

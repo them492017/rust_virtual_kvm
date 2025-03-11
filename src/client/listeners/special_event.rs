@@ -58,6 +58,7 @@ pub async fn special_event_listener(
                                 sender.send(Message::ExchangePubKeyResponse).await?; // TODO: temporary response
                             }
                             Message::TargetChangeNotification => {
+                                println!("Releasing all keys");
                                 release_all(&mut virtual_keyboard)?;
                                 sender.send(Message::TargetChangeResponse).await?;
                             }
