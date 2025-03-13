@@ -1,9 +1,6 @@
 use uuid::Uuid;
 
-use crate::{
-    common::crypto::Crypto,
-    server::client::Client,
-};
+use crate::{common::crypto::Crypto, server::client::Client};
 
 use super::error::StateHandlerError;
 
@@ -44,7 +41,10 @@ impl<T: Crypto> State<T> {
         Ok(&self.clients[client_idx])
     }
 
-    pub fn get_client_mut(&mut self, client_idx: usize) -> Result<&mut Client<T>, StateHandlerError> {
+    pub fn get_client_mut(
+        &mut self,
+        client_idx: usize,
+    ) -> Result<&mut Client<T>, StateHandlerError> {
         if client_idx >= self.clients.len() {
             return Err(StateHandlerError::NotFound);
         }

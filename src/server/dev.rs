@@ -3,7 +3,11 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    common::{dev::{make_keyboard, pick_device, release_all}, error::DynError, net::Message},
+    common::{
+        dev::{make_keyboard, pick_device, release_all},
+        error::DynError,
+        net::Message,
+    },
     server::keyboard_state::KeyboardState,
 };
 
@@ -14,7 +18,7 @@ use super::{
 fn is_mouse(device: &evdev::Device) -> bool {
     device
         .supported_relative_axes()
-        .map_or(false, |axes| axes.contains(RelativeAxisType::REL_X))
+        .is_some_and(|axes| axes.contains(RelativeAxisType::REL_X))
 }
 
 pub async fn start_device_listener(

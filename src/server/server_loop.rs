@@ -55,10 +55,10 @@ pub async fn run(server_addr: SocketAddr) -> Result<(), DynError> {
     let client_tx_clone = client_tx.clone();
     let cancellation_token_clone = cancellation_token.clone();
     tokio::select! {
-        result = start_listening(server_addr, client_tx_clone, client_message_tx, cancellation_token_clone) => {
-            match result {
-                Ok(()) => println!("Server closed gracefully"),
-                Err(err) => eprintln!("Server exited with error: {}", err),
+            result = start_listening(server_addr, client_tx_clone, client_message_tx, cancellation_token_clone) => {
+                match result {
+                    Ok(()) => println!("Server closed gracefully"),
+                    Err(err) => eprintln!("Server exited with error: {}", err),
             }
         },
         result = kbd_listener => {

@@ -16,4 +16,3 @@ pub enum StateHandlerError {
     #[error("Client error")]
     ClientError(#[from] ClientError),
 }
-
