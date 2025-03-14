@@ -1,15 +1,14 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{error::Error, net::SocketAddr, time::Duration};
 
-use rust_virtual_kvm::{
-    self, client::connection::Connection, common::error::DynError, server::server::start_listening,
-};
+use client::connection::Connection;
+use server::server::start_listening;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 async fn connect_client(
     client_addr: SocketAddr,
     server_addr: SocketAddr,
-) -> Result<bool, DynError> {
+) -> Result<bool, Box<dyn Error + Send + Sync>> {
     let mut conn = Connection::default();
     conn.connect(client_addr, server_addr).await?;
     Ok(conn.is_connected)

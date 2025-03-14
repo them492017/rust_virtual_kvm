@@ -1,0 +1,9 @@
+[package]
+name = "input-listener"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+evdev = { version = "0.12.2", features = ["serde", "tokio"] }
+tokio = { version = "1.42.0", features = ["full"] }
+thiserror = "2"
