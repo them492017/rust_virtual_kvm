@@ -17,8 +17,6 @@ use super::transport::{
 const HEADER_LEN: usize = 4;
 const BUFFER_LEN: usize = 256;
 
-pub enum TcpError {}
-
 #[derive(Debug)]
 pub struct TokioTcpTransport<T: Crypto> {
     socket: TcpStream,

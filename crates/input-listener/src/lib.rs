@@ -5,7 +5,6 @@ use thiserror::Error;
 
 pub mod x11;
 
-// TODO: maybe should have a shared error type for all platforms
 #[derive(Debug, Error)]
 pub enum DeviceInputError {
     #[error("")]
@@ -22,7 +21,7 @@ pub trait DeviceInputStreamTrait: Send {
 }
 
 pub struct DeviceInputStream {
-    stream: Box<dyn DeviceInputStreamTrait>,
+    stream: Box<dyn DeviceInputStreamTrait + Send + Sync>,
 }
 
 impl DeviceInputStream {

@@ -4,17 +4,11 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    config::{init, Config},
-    dev::start_device_listener,
-    processor::event_processor,
+    actors::{device::resource::Devices, state::resource::State},
     server::start_listening,
 };
 
 pub async fn run(server_addr: SocketAddr) {
-    let Config {
-        keyboard_stream,
-        mouse_stream,
-    } = init();
     let (event_tx1, event_rx) = mpsc::channel(32);
     let event_tx2 = event_tx1.clone();
     let (client_tx, client_rx) = mpsc::channel(32);
@@ -25,36 +19,32 @@ pub async fn run(server_addr: SocketAddr) {
 
     let cancellation_token_clone = cancellation_token.clone();
     let event_processor = tokio::spawn(async move {
-        event_processor(
-            server_addr,
-            event_rx,
-            client_message_rx,
-            client_rx,
-            grab_request_tx,
-            cancellation_token_clone,
-        )
-        .await
+        let state = State::default();
+        state
+            .process(
+                server_addr,
+                event_rx,
+                client_message_rx,
+                client_rx,
+                grab_request_tx,
+                cancellation_token_clone,
+            )
+            .await
     });
 
     let cancellation_token_clone = cancellation_token.clone();
     let kbd_listener = tokio::spawn(async {
-        start_device_listener(
-            keyboard_stream,
-            event_tx1,
-            grab_request_rx1,
-            cancellation_token_clone,
-        )
-        .await
+        let kbd_devices = Devices::new(input_simulator::DeviceType::Keyboard);
+        kbd_devices
+            .start_device_listener(event_tx1, grab_request_rx1, cancellation_token_clone)
+            .await
     });
     let cancellation_token_clone = cancellation_token.clone();
     let mouse_listener = tokio::spawn(async {
-        start_device_listener(
-            mouse_stream,
-            event_tx2,
-            grab_request_rx2,
-            cancellation_token_clone,
-        )
-        .await
+        let mouse_devices = Devices::new(input_simulator::DeviceType::Mouse);
+        mouse_devices
+            .start_device_listener(event_tx2, grab_request_rx2, cancellation_token_clone)
+            .await
     });
 
     println!("Starting server");

@@ -4,9 +4,11 @@ use chacha20poly1305::ChaCha20Poly1305;
 use tokio::{net::TcpListener, sync::mpsc::Sender};
 use tokio_util::sync::CancellationToken;
 
-use super::{client::Client, handlers::client::handle_client, processor::InternalMessage};
+use crate::InternalMessage;
 
-// TODO: rename
+use super::{client::Client, handlers::client::handle_client};
+
+// TODO: rename and move to actor module
 pub async fn start_listening(
     server_address: SocketAddr,
     client_sender: Sender<Client<ChaCha20Poly1305>>,

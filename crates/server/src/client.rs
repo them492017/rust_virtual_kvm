@@ -3,13 +3,14 @@ use std::net::SocketAddr;
 
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
 use crypto::Crypto;
-use network::{tcp::TokioTcpTransport, transport::Transport, Message, TransportError};
+use network::{
+    input_event::InputEventTransport, tcp::TokioTcpTransport, transport::Transport, Message,
+    TransportError,
+};
 use thiserror::Error;
 use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
 use x25519_dalek::{EphemeralSecret, PublicKey};
-
-use super::input_event_transport::{InputEventError, InputEventTransport};
 
 const RING_BUFFER_LEN: usize = 1024;
 
@@ -17,8 +18,6 @@ const RING_BUFFER_LEN: usize = 1024;
 pub enum ClientConnectionError {
     #[error("Client not ready to receive messages")]
     NotReady,
-    #[error("Input event transport error")]
-    InputEventTransportError(#[from] InputEventError),
     #[error("Transport error during connection")]
     TransportError(#[from] TransportError),
     #[error("Invalid message received during connection")]

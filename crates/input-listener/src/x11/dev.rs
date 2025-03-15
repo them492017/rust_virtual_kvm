@@ -22,6 +22,7 @@ impl DeviceInputStreamTrait for evdev::EventStream {
     }
 }
 
+// TODO: move this into a new method for a generic struct
 pub fn pick_device(name: &str) -> evdev::Device {
     use std::io::prelude::*;
 

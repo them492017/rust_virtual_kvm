@@ -4,7 +4,21 @@ use evdev::{
     uinput::VirtualDeviceBuilder, AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
 };
 
-use crate::DeviceOutputError;
+use crate::{DeviceOutputError, VirtualDevice};
+
+impl VirtualDevice for evdev::uinput::VirtualDevice {
+    fn emit(&mut self, event: InputEvent) -> Result<(), DeviceOutputError> {
+        Ok(self.emit(&[event])?)
+    }
+
+    fn release_all(&mut self) -> Result<(), DeviceOutputError> {
+        release_all(self)
+    }
+
+    fn device_type(&self) -> crate::DeviceType {
+        unimplemented!("Not implemented for uinput")
+    }
+}
 
 // TODO: replace with Xtest or something
 // also should implement the trait defined in ../lib.rs

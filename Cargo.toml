@@ -17,6 +17,7 @@ members = [
 
 [dependencies]
 tokio = { version = "1.42.0", features = ["full"] }
+tokio-util = "0.7.13"
 
 server = { path = "crates/server" }
 client = { path = "crates/client" }

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use x25519_dalek::PublicKey;
 
+pub mod input_event;
 pub mod tcp;
 pub mod transport;
 pub mod udp;

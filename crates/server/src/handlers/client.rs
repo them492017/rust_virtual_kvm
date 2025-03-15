@@ -16,10 +16,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{
-    client::{Client, ClientConnectionError, Connection},
-    handlers::client_message_sender::ClientMessageSender,
-    processor::InternalMessage,
-    server_message::ServerMessage,
+    client::{Client, ClientConnectionError, Connection}, handlers::client_message_sender::ClientMessageSender, InternalMessage, ServerMessage
 };
 
 // TODO: refactor to a common location
@@ -28,7 +25,7 @@ const MAX_RETRIES: u64 = 3;
 const CHANNEL_BUF_LEN: usize = 256;
 
 #[derive(Debug, Error)]
-pub enum EventProcessorError {
+pub enum ClientHandlerError {
     #[error("Could not send new client through channel")]
     ClientSendError(#[from] SendError<Client<ChaCha20Poly1305>>),
     #[error("Could not connect to client")]
@@ -48,7 +45,7 @@ pub async fn handle_client(
     client_sender: Sender<Client<ChaCha20Poly1305>>,
     client_message_sender: Sender<InternalMessage>,
     cancellation_token: CancellationToken,
-) -> Result<(), EventProcessorError> {
+) -> Result<(), ClientHandlerError> {
     let mut transport = TokioTcpTransport::new(stream);
     let (message_sender, message_receiver) = mpsc::channel(CHANNEL_BUF_LEN);
     let client: Client<ChaCha20Poly1305> = Client::connect(&mut transport, message_sender).await?;
@@ -73,7 +70,7 @@ async fn process_events(
     message_receiver: Receiver<Message>,
     client_message_sender: Sender<InternalMessage>,
     cancellation_token: CancellationToken,
-) -> Result<(), EventProcessorError> {
+) -> Result<(), ClientHandlerError> {
     let (reader_transport, writer_transport) = transport.into_split();
 
     let client_message_sender = ClientMessageSender::new(id, client_message_sender);
@@ -108,7 +105,7 @@ async fn process_events(
 async fn tcp_listener(
     mut listener: TokioTcpTransportReader<ChaCha20Poly1305>,
     client_message_sender: ClientMessageSender,
-) -> Result<(), EventProcessorError> {
+) -> Result<(), ClientHandlerError> {
     loop {
         let message = listener.receive_message().await?;
         client_message_sender.send_client_message(message).await?;
@@ -120,7 +117,7 @@ async fn tcp_sender(
     mut sender: TokioTcpTransportWriter<ChaCha20Poly1305>,
     mut message_receiver: Receiver<Message>,
     client_message_sender: ClientMessageSender,
-) -> Result<(), EventProcessorError> {
+) -> Result<(), ClientHandlerError> {
     let duration = Duration::from_secs(HEARTBEAT_INTERVAL);
     let mut fail_count = 0;
 
@@ -151,7 +148,7 @@ async fn handle_send_result(
     fail_count: &mut u64,
     id: Uuid,
     client_message_sender: &ClientMessageSender,
-) -> Result<(), EventProcessorError> {
+) -> Result<(), ClientHandlerError> {
     if let Err(err) = result {
         *fail_count += 1;
         eprintln!(
@@ -162,7 +159,7 @@ async fn handle_send_result(
         if *fail_count >= MAX_RETRIES {
             let message = ServerMessage::ClientDisconnect { id };
             client_message_sender.send_server_message(message).await?;
-            return Err(EventProcessorError::HeartbeatFail);
+            return Err(ClientHandlerError::HeartbeatFail);
         }
     } else {
         *fail_count = 0;

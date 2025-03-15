@@ -2,7 +2,7 @@ use network::Message;
 use tokio::sync::mpsc::{error::SendError, Sender};
 use uuid::Uuid;
 
-use crate::{processor::InternalMessage, server_message::ServerMessage};
+use crate::{InternalMessage, ServerMessage};
 
 pub struct ClientMessageSender {
     client_id: Uuid,

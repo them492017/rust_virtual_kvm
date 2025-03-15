@@ -1,11 +1,26 @@
+use network::Message;
+use uuid::Uuid;
+
+pub mod actors;
 pub mod client;
-pub mod config;
-pub mod dev;
 pub mod handlers;
-pub mod input_event_transport;
 pub mod keyboard_state;
-pub mod processor;
 pub mod server;
 pub mod server_loop;
-pub mod server_message;
-pub mod state;
+
+#[derive(Debug)]
+pub enum ServerMessage {
+    Cycle,
+    ClientDisconnect { id: Uuid },
+}
+
+#[derive(Debug)]
+pub enum InternalMessage {
+    ClientMessage {
+        message: Message,
+        sender: Option<Uuid>,
+    },
+    LocalMessage {
+        message: ServerMessage,
+    },
+}
