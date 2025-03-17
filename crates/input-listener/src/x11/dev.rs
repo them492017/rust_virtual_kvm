@@ -1,6 +1,6 @@
 use std::{future::Future, pin::Pin};
 
-use evdev::InputEvent;
+use input_event::InputEvent;
 
 use crate::{DeviceInputError, DeviceInputStreamTrait};
 
@@ -8,7 +8,7 @@ impl DeviceInputStreamTrait for evdev::EventStream {
     fn next_event(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Result<InputEvent, DeviceInputError>> + Send + '_>> {
-        Box::pin(async { Ok(self.next_event().await?) })
+        Box::pin(async { Ok(self.next_event().await?.try_into()?) })
     }
 
     fn grab_device(&mut self) -> Result<(), DeviceInputError> {

@@ -8,6 +8,7 @@ edition = "2021"
 members = [
     "crates/client",
     "crates/crypto",
+    "crates/input-event",
     "crates/input-listener",
     "crates/input-simulator",
     "crates/network",
@@ -22,3 +23,6 @@ tokio-util = "0.7.13"
 server = { path = "crates/server" }
 client = { path = "crates/client" }
 ui = { path = "crates/ui" }
+
+[build-dependencies]
+pkg-config = "0.3"

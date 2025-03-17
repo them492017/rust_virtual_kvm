@@ -1,13 +1,11 @@
 [package]
-name = "input-simulator"
+name = "input-event"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# TODO: conditional compilation
 evdev = { version = "0.12.2", features = ["serde", "tokio"] }
+serde = { version = "1.0.214", features = ["derive"] }
 strum = { version = "0.27", features = ["derive"] }
-tokio = { version = "1.42.0", features = ["full"] }
 thiserror = "2"
-x11 = { version = "2.21", features = ["xlib", "xtest"] }
-
-input-event = { path = "../input-event" }

@@ -4,7 +4,7 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    actors::{device::resource::Devices, state::resource::State},
+    actors::{device::resource::DeviceResource, state::resource::StateResource},
     server::start_listening,
 };
 
@@ -19,7 +19,7 @@ pub async fn run(server_addr: SocketAddr) {
 
     let cancellation_token_clone = cancellation_token.clone();
     let event_processor = tokio::spawn(async move {
-        let state = State::default();
+        let state = StateResource::default();
         state
             .process(
                 server_addr,
@@ -32,16 +32,16 @@ pub async fn run(server_addr: SocketAddr) {
             .await
     });
 
+    let kbd_devices = DeviceResource::new("Keyboard");
     let cancellation_token_clone = cancellation_token.clone();
-    let kbd_listener = tokio::spawn(async {
-        let kbd_devices = Devices::new(input_simulator::DeviceType::Keyboard);
+    let kbd_listener = tokio::spawn(async move {
         kbd_devices
             .start_device_listener(event_tx1, grab_request_rx1, cancellation_token_clone)
             .await
     });
+    let mouse_devices = DeviceResource::new("Mouse");
     let cancellation_token_clone = cancellation_token.clone();
-    let mouse_listener = tokio::spawn(async {
-        let mouse_devices = Devices::new(input_simulator::DeviceType::Mouse);
+    let mouse_listener = tokio::spawn(async move {
         mouse_devices
             .start_device_listener(event_tx2, grab_request_rx2, cancellation_token_clone)
             .await

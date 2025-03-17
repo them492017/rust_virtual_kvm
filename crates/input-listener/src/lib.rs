@@ -1,14 +1,17 @@
 use std::pin::Pin;
 
-use evdev::InputEvent;
+use input_event::{mapper::error::EventMappingError, InputEvent};
 use thiserror::Error;
 
 pub mod x11;
 
 #[derive(Debug, Error)]
 pub enum DeviceInputError {
-    #[error("")]
+    #[error("IO error")]
     IOError(#[from] std::io::Error),
+    #[error("Error when converting backend specific input event to generic event")]
+    InputEventConversionError(#[from] EventMappingError), // TODO: figure out how to enforce that
+                                                          // this is a mapping error only
 }
 
 // TODO: Consider making a sync version

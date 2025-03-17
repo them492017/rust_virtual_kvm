@@ -1,7 +1,7 @@
 use std::{fmt, net::SocketAddr};
 
+use ::input_event::InputEvent;
 use chacha20poly1305::Nonce;
-use evdev::{EventType, InputEvent};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use x25519_dalek::PublicKey;
@@ -44,7 +44,7 @@ impl MessageWithNonce {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Message {
-    InputEvent { event: SerializableInputEvent },
+    InputEvent { event: InputEvent },
     TargetChangeNotification,
     TargetChangeResponse,
     ClipboardChanged { content: String }, // TODO: content could be an image
@@ -74,28 +74,5 @@ impl fmt::Display for Message {
             Message::Handshake => write!(f, "Handshake"),
             Message::Heartbeat => write!(f, "Heartbeat"),
         }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SerializableInputEvent {
-    type_: EventType,
-    code: u16,
-    value: i32,
-}
-
-impl From<InputEvent> for SerializableInputEvent {
-    fn from(value: InputEvent) -> Self {
-        SerializableInputEvent {
-            type_: value.event_type(),
-            code: value.code(),
-            value: value.value(),
-        }
-    }
-}
-
-impl From<SerializableInputEvent> for InputEvent {
-    fn from(val: SerializableInputEvent) -> Self {
-        InputEvent::new(val.type_, val.code, val.value)
     }
 }

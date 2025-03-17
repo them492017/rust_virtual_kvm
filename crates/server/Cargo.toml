@@ -16,5 +16,6 @@ thiserror = "2"
 
 crypto = { path = "../crypto" }
 network = { path = "../network" }
+input-event = { path = "../input-event" }
 input-listener = { path = "../input-listener" }
 input-simulator = { path = "../input-simulator" }

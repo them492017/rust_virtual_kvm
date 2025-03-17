@@ -1,4 +1,4 @@
-use evdev::InputEventKind;
+use input_event::{InputEvent, KeyboardEventType};
 use input_listener::DeviceInputError;
 use input_simulator::DeviceOutputError;
 use network::Message;
@@ -14,7 +14,7 @@ use crate::{
     InternalMessage, ServerMessage,
 };
 
-use super::resource::Devices;
+use super::resource::DeviceResource;
 
 // TODO: rename error
 #[derive(Debug, Error)]
@@ -29,35 +29,47 @@ pub enum DeviceListenerError {
     GrabRequestRecvError(#[from] RecvError),
 }
 
-impl Devices {
+impl DeviceResource {
     pub async fn start_device_listener(
         mut self,
         event_sender: mpsc::Sender<InternalMessage>,
         mut grab_request_receiver: broadcast::Receiver<bool>,
         cancellation_token: CancellationToken,
     ) -> Result<(), DeviceListenerError> {
-        println!("Starting device listener for {}", self.device_type);
+        println!("Starting device listener for {}", "[INSERT DEV NAME HERE]"); // TODO: add name
         let mut keyboard_state = KeyboardState::default();
 
         loop {
             tokio::select! {
                 event = self.input_stream.next_event() => {
-                    let event = event?;
-                    if let InputEventKind::Key(key) = event.kind() {
-                        if event.value() == 1 {
-                            keyboard_state.press_key(key);
-                            // handle combinations
-                            self.handle_combinations(&mut keyboard_state, &event_sender).await?;
-                        }
-                        if event.value() == 0 {
-                            keyboard_state.release_key(key);
-                        }
+                    match event {
+                        Ok(event) => {
+                            if let InputEvent::Keyboard { key, event_type } = event {
+                                match event_type {
+                                    KeyboardEventType::KeyPressed => {
+                                        // TODO: make keyboard_state use the generic input_event::Key enum
+                                        // instead of coupling it to evdev
+                                        keyboard_state.press_key(key.into());
+                                        // handle combinations
+                                        self.handle_combinations(&mut keyboard_state, &event_sender).await?;
+                                    }
+                                    KeyboardEventType::KeyReleased => {
+                                        keyboard_state.release_key(key.into());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            let message = InternalMessage::ClientMessage {
+                                message: Message::InputEvent { event },
+                                sender: None,
+                            };
+                            event_sender.send(message).await?;
+                        },
+                        Err(DeviceInputError::InputEventConversionError(_)) => {},
+                        Err(err) => {
+                            return Err(err.into())
+                        },
                     }
-                    let message = InternalMessage::ClientMessage {
-                        message: Message::InputEvent { event: event.into() },
-                        sender: None,
-                    };
-                    event_sender.send(message).await?;
                 },
                 request = grab_request_receiver.recv() => {
                     match request {

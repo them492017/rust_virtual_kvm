@@ -16,7 +16,9 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::{
-    client::{Client, ClientConnectionError, Connection}, handlers::client_message_sender::ClientMessageSender, InternalMessage, ServerMessage
+    client::{Client, ClientConnectionError, Connection},
+    handlers::client_message_sender::ClientMessageSender,
+    InternalMessage, ServerMessage,
 };
 
 // TODO: refactor to a common location
@@ -64,6 +66,7 @@ pub async fn handle_client(
     .await
 }
 
+// TODO: make a client actor + resource
 async fn process_events(
     id: Uuid,
     transport: TokioTcpTransport<ChaCha20Poly1305>,

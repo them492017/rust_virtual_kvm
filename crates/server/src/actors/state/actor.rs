@@ -9,11 +9,9 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    client::Client, InternalMessage, ServerMessage
-};
+use crate::{client::Client, InternalMessage, ServerMessage};
 
-use super::resource::{State, StateHandlerError};
+use super::resource::{StateHandlerError, StateResource};
 
 #[derive(Debug, Error)]
 pub enum ProcessorError {
@@ -33,7 +31,7 @@ pub enum ProcessorError {
     IOError(#[from] std::io::Error),
 }
 
-impl State<ChaCha20Poly1305> {
+impl StateResource<ChaCha20Poly1305> {
     // TODO: handle batches of events, not just single events
     pub async fn process(
         mut self,
@@ -107,7 +105,11 @@ impl State<ChaCha20Poly1305> {
                         if let Some(target) = self.get_target_mut() {
                             if target.can_receive() {
                                 transport
-                                    .send_message_to(message, target.address, Some(target.key.clone()))
+                                    .send_message_to(
+                                        message,
+                                        target.address,
+                                        Some(target.key.clone()),
+                                    )
                                     .await?;
                             } else {
                                 target.buffer_message(message);
@@ -149,8 +151,7 @@ impl State<ChaCha20Poly1305> {
                 }
                 Message::TargetChangeResponse => {
                     let sender = sender.ok_or(ProcessorError::InvalidArgument)?;
-                    self
-                        .handle_change_target_response(sender, transport)
+                    self.handle_change_target_response(sender, transport)
                         .await?;
                 }
                 _ => {

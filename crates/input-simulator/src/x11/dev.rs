@@ -1,27 +1,21 @@
 use std::{thread, time::Duration};
 
-use evdev::{
-    uinput::VirtualDeviceBuilder, AttributeSet, EventType, InputEvent, Key, RelativeAxisType,
-};
+use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, EventType, Key, RelativeAxisType};
 
 use crate::{DeviceOutputError, VirtualDevice};
 
 impl VirtualDevice for evdev::uinput::VirtualDevice {
-    fn emit(&mut self, event: InputEvent) -> Result<(), DeviceOutputError> {
-        Ok(self.emit(&[event])?)
+    fn emit(&mut self, event: input_event::InputEvent) -> Result<(), DeviceOutputError> {
+        Ok(self.emit(&[event.into()])?)
     }
 
     fn release_all(&mut self) -> Result<(), DeviceOutputError> {
-        release_all(self)
-    }
-
-    fn device_type(&self) -> crate::DeviceType {
-        unimplemented!("Not implemented for uinput")
+        Ok(ALL_KEYS.iter().try_for_each(|key| {
+            self.emit(&[evdev::InputEvent::new(EventType::KEY, key.code(), 0)])
+        })?)
     }
 }
 
-// TODO: replace with Xtest or something
-// also should implement the trait defined in ../lib.rs
 pub fn make_keyboard() -> Result<evdev::uinput::VirtualDevice, DeviceOutputError> {
     let device = VirtualDeviceBuilder::new()?
         .name("Fake KVM Keyboard")
@@ -45,16 +39,7 @@ pub fn make_mouse() -> Result<evdev::uinput::VirtualDevice, DeviceOutputError> {
     Ok(device)
 }
 
-pub fn release_all(device: &mut evdev::uinput::VirtualDevice) -> Result<(), DeviceOutputError> {
-    ALL_KEYS.iter().for_each(|key| {
-        device
-            .emit(dbg!(&[InputEvent::new(EventType::KEY, key.code(), 0)]))
-            .unwrap();
-        thread::sleep(Duration::from_millis(40));
-    });
-    Ok(())
-}
-
+// TODO: replace with strum iterable from input-event crate
 const ALL_KEYS: [Key; 202] = [
     Key::KEY_RESERVED,
     Key::KEY_ESC,

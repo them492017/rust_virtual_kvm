@@ -3,8 +3,7 @@ use std::time::Duration;
 use chacha20poly1305::ChaCha20Poly1305;
 use evdev::uinput::VirtualDevice;
 use input_simulator::{
-    x11::dev::{make_keyboard, release_all},
-    DeviceOutputError,
+    x11::dev::make_keyboard, DeviceOutputError, VirtualDevice as VirtualDeviceTrait,
 };
 use network::{
     tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
@@ -77,7 +76,7 @@ pub async fn special_event_listener(
                             }
                             Message::TargetChangeNotification => {
                                 println!("Releasing all keys");
-                                release_all(&mut virtual_keyboard)?;
+                                virtual_keyboard.release_all()?;
                                 sender.send(Message::TargetChangeResponse).await?;
                             }
                             Message::Heartbeat => {}

@@ -24,7 +24,7 @@ pub async fn ui() -> Result<(), UIError> {
 
     match chosen.to_lowercase().as_str() {
         "server" => {
-            print!("Server Address: ");
+            print!("Server Address (ip:port): ");
             let addr = get_input();
             let server_addr: SocketAddr = addr
                 .as_str()
@@ -33,12 +33,12 @@ pub async fn ui() -> Result<(), UIError> {
             server_loop::run(server_addr).await;
         }
         "client" => {
-            print!("Server Address: ");
+            print!("Server Address (ip:port): ");
             let server_addr: SocketAddr = get_input()
                 .as_str()
                 .parse()
                 .expect("Should provide a valid socket address");
-            print!("Client Address: ");
+            print!("Client Address (ip:port): ");
             let client_addr: SocketAddr = get_input()
                 .as_str()
                 .parse()

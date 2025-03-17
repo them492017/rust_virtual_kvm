@@ -7,3 +7,5 @@ edition = "2021"
 evdev = { version = "0.12.2", features = ["serde", "tokio"] }
 tokio = { version = "1.42.0", features = ["full"] }
 thiserror = "2"
+
+input-event = { path = "../input-event" }

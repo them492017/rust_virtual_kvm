@@ -21,15 +21,15 @@ pub enum StateHandlerError {
     ClientError(#[from] ClientConnectionError),
 }
 
-pub struct State<T: Crypto> {
+pub struct StateResource<T: Crypto> {
     clients: Vec<Client<T>>,
     pub clipboard_contents: Option<String>,
     target_idx: Option<usize>,
 }
 
-impl<T: Crypto> Default for State<T> {
+impl<T: Crypto> Default for StateResource<T> {
     fn default() -> Self {
-        State {
+        StateResource {
             clients: Vec::new(),
             clipboard_contents: None,
             target_idx: None,
@@ -37,7 +37,7 @@ impl<T: Crypto> Default for State<T> {
     }
 }
 
-impl<T: Crypto> State<T> {
+impl<T: Crypto> StateResource<T> {
     pub fn add_client(&mut self, client: Client<T>) -> usize {
         self.clients.push(client);
         self.clients.len() - 1
@@ -125,7 +125,7 @@ impl<T: Crypto> State<T> {
 }
 
 // TODO: maybe make a trait for this
-impl<T: Crypto + Clone> State<T> {
+impl<T: Crypto + Clone> StateResource<T> {
     pub async fn change_target(
         &mut self,
         new_idx: Option<usize>,
@@ -233,13 +233,13 @@ pub mod test {
         use network::Message;
         use tokio::sync::mpsc;
 
-        use crate::{actors::state::resource::State, client::test::test_client_fixture};
+        use crate::{actors::state::resource::StateResource, client::test::test_client_fixture};
 
         pub fn test_state_fixture(
             client_channels: Vec<mpsc::Sender<Message>>,
             target_idx: Option<usize>,
-        ) -> State<ChaCha20Poly1305> {
-            let mut state = State::default();
+        ) -> StateResource<ChaCha20Poly1305> {
+            let mut state = StateResource::default();
             client_channels.into_iter().for_each(|channel| {
                 state.add_client(test_client_fixture(channel));
             });
