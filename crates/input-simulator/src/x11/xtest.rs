@@ -3,7 +3,7 @@ use std::{ffi::c_uint, ptr};
 use input_event::{InputEvent, Key, KeyboardEventType};
 use strum::IntoEnumIterator;
 use x11::{
-    xlib::{self, Display, XOpenDisplay},
+    xlib::{self, Display, XFlush, XOpenDisplay},
     xtest::{XTestFakeKeyEvent, XTestFakeRelativeMotionEvent},
 };
 
@@ -32,8 +32,7 @@ impl X11VirtualDevice {
 }
 
 fn keycode_from_key(key: Key) -> c_uint {
-    eprintln!("[WARN] Keycode from key is not properly inplemented");
-    key as u32
+    evdev::Key::from(key).code().into()
 }
 
 impl VirtualDevice for X11VirtualDevice {
@@ -45,12 +44,12 @@ impl VirtualDevice for X11VirtualDevice {
                     KeyboardEventType::KeyPressed | KeyboardEventType::KeyHeld => 1,
                     KeyboardEventType::KeyReleased => 0,
                 };
-                if 1 == unsafe { XTestFakeKeyEvent(self.display, keycode, is_press, 0) } {
-                    Ok(())
-                } else {
-                    Err(DeviceOutputError::EmitError(
-                        "Could not emit Xtest fake key event".into(),
-                    ))
+                unsafe {
+                    if XTestFakeKeyEvent(self.display, keycode, is_press, 0) == 0 {
+                        return Err(DeviceOutputError::EmitError(
+                            "Could not emit Xtest fake key event".into(),
+                        ));
+                    }
                 }
             }
             InputEvent::Pointer { axis, diff } => {
@@ -58,19 +57,23 @@ impl VirtualDevice for X11VirtualDevice {
                     input_event::PointerAxis::Horizontal => (diff, 0),
                     input_event::PointerAxis::Vertical => (0, diff),
                 };
-                if 1 == unsafe {
-                    // TODO: figure out why this differs from the xlib documentation
-                    XTestFakeRelativeMotionEvent(self.display, dx, dy, 0, 0)
-                } {
-                    Ok(())
-                } else {
-                    Err(DeviceOutputError::EmitError(
-                        "Could not emit Xtest fake motion event".into(),
-                    ))
+                unsafe {
+                    if XTestFakeRelativeMotionEvent(self.display, dx, dy, 0, 0) == 0 {
+                        return Err(DeviceOutputError::EmitError(
+                            "Could not emit Xtest fake key event".into(),
+                        ));
+                    }
                 }
             }
         }
-        // XFlush(self.display);
+        unsafe {
+            if XFlush(self.display) == 0 {
+                return Err(DeviceOutputError::EmitError(
+                    "Could not flush Xtest fake key event".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn release_all(&mut self) -> Result<(), DeviceOutputError> {

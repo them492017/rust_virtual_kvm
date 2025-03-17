@@ -42,8 +42,7 @@ async fn input_event_processor(
         tokio::select! {
             message = transport.receive_message() => {
                 match message {
-                    Ok(event) =>
-                    match event {
+                    Ok(event) => match event {
                         Message::InputEvent { event } => {
                             simulator.emit(event)?;
                         }
@@ -52,11 +51,11 @@ async fn input_event_processor(
                         }
                     },
                     Err(err) => {
-                    eprintln!(
-                        "An error has occured when listening to UDP messages: {:?}",
-                        err
-                    );
-                    return Err(err.into())
+                        eprintln!(
+                            "An error has occured when listening to UDP messages: {:?}",
+                            err
+                        );
+                        return Err(err.into())
                     }
                 }
             },
