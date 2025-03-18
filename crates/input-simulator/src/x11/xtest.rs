@@ -1,6 +1,6 @@
-use std::ptr;
+use std::{ptr, sync::Mutex};
 
-use input_event::{InputEvent, Key, KeyboardEventType};
+use input_event::{InputEvent, Key, KeyboardEvent, KeyboardEventType};
 use strum::IntoEnumIterator;
 use x11::{
     xlib::{self, Display, XFlush, XOpenDisplay},
@@ -10,7 +10,7 @@ use x11::{
 use crate::{DeviceOutputError, VirtualDevice};
 
 pub(crate) struct X11VirtualDevice {
-    display: *mut Display,
+    display: Mutex<*mut Display>, // TODO: Consider the use of a blocking lock with tokio
 }
 
 // Assume display never gets closed
@@ -21,49 +21,64 @@ impl X11VirtualDevice {
         let display = unsafe {
             match XOpenDisplay(ptr::null()) {
                 d if d == ptr::null::<xlib::Display>() as *mut xlib::Display => {
-                    panic!()
+                    panic!("Could not open x11 display")
                 }
                 display => display,
             }
         };
 
-        Self { display }
+        Self {
+            display: Mutex::new(display),
+        }
     }
 }
 
 impl VirtualDevice for X11VirtualDevice {
     fn emit(&mut self, event: InputEvent) -> Result<(), DeviceOutputError> {
+        let display = self.display.lock().unwrap();
         match event {
-            InputEvent::Keyboard { key, event_type } => {
-                let keycode = key.to_x11_keycode(self.display)?;
-                let is_press = match event_type {
-                    KeyboardEventType::KeyPressed | KeyboardEventType::KeyHeld => 1,
-                    KeyboardEventType::KeyReleased => 0,
+            InputEvent::Keyboard(event) => {
+                let (key, is_press) = match event {
+                    KeyboardEvent::KeyPressed(key) | KeyboardEvent::KeyReleased(key) => (key, 1),
+                    KeyboardEvent::KeyHeld(key) => (key, 0),
                 };
                 unsafe {
-                    if XTestFakeKeyEvent(self.display, keycode.into(), is_press, 0) == 0 {
+                    if XTestFakeKeyEvent(
+                        *display,
+                        key.to_x11_keycode(*display)?.into(),
+                        is_press,
+                        0,
+                    ) == 0
+                    {
+                        eprintln!("Could not emit Xtest fake key event");
                         return Err(DeviceOutputError::EmitError(
                             "Could not emit Xtest fake key event".into(),
                         ));
                     }
                 }
             }
-            InputEvent::Pointer { axis, diff } => {
-                let (dx, dy) = match axis {
-                    input_event::PointerAxis::Horizontal => (diff, 0),
-                    input_event::PointerAxis::Vertical => (0, diff),
-                };
-                unsafe {
-                    if XTestFakeRelativeMotionEvent(self.display, dx, dy, 0, 0) == 0 {
-                        return Err(DeviceOutputError::EmitError(
-                            "Could not emit Xtest fake key event".into(),
-                        ));
+            InputEvent::Mouse(event) => match event {
+                input_event::MouseEvent::Motion { axis, diff } => {
+                    let (dx, dy) = match axis {
+                        input_event::PointerAxis::Horizontal => (diff, 0),
+                        input_event::PointerAxis::Vertical => (0, diff),
+                    };
+                    unsafe {
+                        if XTestFakeRelativeMotionEvent(*display, dx, dy, 0, 0) == 0 {
+                            eprintln!("Could not emit Xtest fake motion event");
+                            return Err(DeviceOutputError::EmitError(
+                                "Could not emit Xtest fake key event".into(),
+                            ));
+                        }
                     }
                 }
-            }
+                input_event::MouseEvent::Button { event_type, button } => todo!(),
+                input_event::MouseEvent::Scroll { axis, diff } => todo!(),
+            },
         }
         unsafe {
-            if XFlush(self.display) == 0 {
+            if XFlush(*display) == 0 {
+                eprintln!("Error in XFlush call");
                 return Err(DeviceOutputError::EmitError(
                     "Could not flush Xtest fake key event".into(),
                 ));
@@ -74,10 +89,8 @@ impl VirtualDevice for X11VirtualDevice {
 
     fn release_all(&mut self) -> Result<(), DeviceOutputError> {
         Key::iter().try_for_each(|key| {
-            let event = InputEvent::Keyboard {
-                key,
-                event_type: KeyboardEventType::KeyPressed,
-            };
+            let event = InputEvent::Keyboard(KeyboardEvent::KeyReleased(key));
+            // TODO: consider refactoring to avoid repeatedly locking and unlocking
             self.emit(event)
         })
     }

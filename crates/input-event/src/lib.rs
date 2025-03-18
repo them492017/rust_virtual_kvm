@@ -7,11 +7,28 @@ pub mod mapper;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InputEvent {
-    Keyboard {
-        key: Key,
-        event_type: KeyboardEventType,
+    Keyboard(KeyboardEvent),
+    Mouse(MouseEvent),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyboardEvent {
+    KeyPressed(Key),
+    KeyReleased(Key),
+    KeyHeld(Key),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MouseEvent {
+    Motion {
+        axis: PointerAxis,
+        diff: i32,
     },
-    Pointer {
+    Button {
+        event_type: KeyboardEventType,
+        button: Key,
+    },
+    Scroll {
         axis: PointerAxis,
         diff: i32,
     },

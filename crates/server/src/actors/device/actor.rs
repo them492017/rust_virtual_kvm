@@ -1,4 +1,4 @@
-use input_event::{InputEvent, KeyboardEventType};
+use input_event::{InputEvent, KeyboardEvent};
 use input_listener::DeviceInputError;
 use input_simulator::DeviceOutputError;
 use network::Message;
@@ -44,16 +44,16 @@ impl DeviceResource {
                 event = self.input_stream.next_event() => {
                     match event {
                         Ok(event) => {
-                            if let InputEvent::Keyboard { key, event_type } = event {
-                                match event_type {
-                                    KeyboardEventType::KeyPressed => {
+                            if let InputEvent::Keyboard(keyboard_event) = event {
+                                match keyboard_event {
+                                    KeyboardEvent::KeyPressed(key) => {
                                         // TODO: make keyboard_state use the generic input_event::Key enum
                                         // instead of coupling it to evdev
                                         keyboard_state.press_key(key.into());
                                         // handle combinations
                                         self.handle_combinations(&mut keyboard_state, &event_sender).await?;
                                     }
-                                    KeyboardEventType::KeyReleased => {
+                                    KeyboardEvent::KeyReleased(key) => {
                                         keyboard_state.release_key(key.into());
                                     }
                                     _ => {}

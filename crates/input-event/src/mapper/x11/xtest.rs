@@ -111,6 +111,8 @@ impl Key {
             _ => return Err(EventMappingError::UnsupportedKeyError), // TODO: maybe change
         };
 
-        unsafe { Ok(XKeysymToKeycode(display, keysym.into())) }
+        unsafe {
+            Ok(XKeysymToKeycode(display, keysym.into()))
+        }
     }
 }

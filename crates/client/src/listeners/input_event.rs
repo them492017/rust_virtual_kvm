@@ -47,7 +47,7 @@ async fn input_event_processor(
                             simulator.emit(event)?;
                         }
                         _ => {
-                            eprintln!("Event is not a keyboard event: {:?}", event);
+                            eprintln!("Event is not an input event: {:?}", event);
                         }
                     },
                     Err(err) => {
