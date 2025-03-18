@@ -1,4 +1,4 @@
-use std::{ffi::c_uint, ptr};
+use std::ptr;
 
 use input_event::{InputEvent, Key, KeyboardEventType};
 use strum::IntoEnumIterator;
@@ -13,7 +13,7 @@ pub(crate) struct X11VirtualDevice {
     display: *mut Display,
 }
 
-// TODO: ENSURE THIS IS A VALID IMPL
+// Assume display never gets closed
 unsafe impl Send for X11VirtualDevice {}
 
 impl X11VirtualDevice {
@@ -31,21 +31,17 @@ impl X11VirtualDevice {
     }
 }
 
-fn keycode_from_key(key: Key) -> c_uint {
-    evdev::Key::from(key).code().into()
-}
-
 impl VirtualDevice for X11VirtualDevice {
     fn emit(&mut self, event: InputEvent) -> Result<(), DeviceOutputError> {
         match event {
             InputEvent::Keyboard { key, event_type } => {
-                let keycode = keycode_from_key(key);
+                let keycode = key.to_x11_keycode(self.display)?;
                 let is_press = match event_type {
                     KeyboardEventType::KeyPressed | KeyboardEventType::KeyHeld => 1,
                     KeyboardEventType::KeyReleased => 0,
                 };
                 unsafe {
-                    if XTestFakeKeyEvent(self.display, keycode, is_press, 0) == 0 {
+                    if XTestFakeKeyEvent(self.display, keycode.into(), is_press, 0) == 0 {
                         return Err(DeviceOutputError::EmitError(
                             "Could not emit Xtest fake key event".into(),
                         ));

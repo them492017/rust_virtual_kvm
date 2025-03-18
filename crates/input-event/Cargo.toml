@@ -9,3 +9,4 @@ evdev = { version = "0.12.2", features = ["serde", "tokio"] }
 serde = { version = "1.0.214", features = ["derive"] }
 strum = { version = "0.27", features = ["derive"] }
 thiserror = "2"
+x11 = { version = "2.21", features = ["xlib"] }

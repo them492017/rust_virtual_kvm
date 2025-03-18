@@ -1,4 +1,4 @@
-use input_event::InputEvent;
+use input_event::{mapper::error::EventMappingError, InputEvent};
 use thiserror::Error;
 use x11::xtest::X11VirtualDevice;
 
@@ -10,6 +10,8 @@ pub enum DeviceOutputError {
     IOError(#[from] std::io::Error),
     #[error("Event emitting error")]
     EmitError(String), // TODO: update this
+    #[error("Event conversion error")]
+    ConversionError(#[from] EventMappingError),
 }
 
 pub trait VirtualDevice: Send {

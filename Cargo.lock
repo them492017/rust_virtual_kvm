@@ -389,6 +389,7 @@ dependencies = [
  "serde",
  "strum",
  "thiserror 2.0.12",
+ "x11",
 ]
 
 [[package]]
