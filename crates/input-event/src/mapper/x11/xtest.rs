@@ -114,7 +114,7 @@ impl Key {
             Key::KEY_LEFTMETA => keysym::XK_Super_L,
             Key::KEY_RIGHTMETA => keysym::XK_Super_R,
             Key::KEY_MENU => keysym::XK_Menu,
-            _ => return Err(EventMappingError::UnsupportedKeyError), // TODO: maybe change
+            _ => return Err(EventMappingError::UnsupportedKeyError(self)), // TODO: maybe change
         };
 
         unsafe { Ok(XKeysymToKeycode(display, keysym.into())) }

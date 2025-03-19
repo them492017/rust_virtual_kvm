@@ -13,17 +13,17 @@ pub mod udp;
 
 #[derive(Debug, Error)]
 pub enum TransportError {
-    #[error("Serialization error")]
+    #[error("Serialization error: {0}")]
     SerializationError(#[from] bincode::Error),
-    #[error("Encryption error")]
+    #[error("Encryption error: {0}")]
     EncryptionError(#[from] crypto::EncryptionError),
     #[error("Invalid message structure with no message length")]
     InvalidMessageStructure,
     #[error("Error when converting message length byte array to integer")]
     ByteArrayConversionError,
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Decryption error")]
+    #[error("Connection was closed - 0 bytes read")]
     ConnectionClosed,
 }
 

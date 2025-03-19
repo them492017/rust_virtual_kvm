@@ -26,11 +26,11 @@ pub enum ProcessorError {
     ClientListenerChannelClosed,
     #[error("Invalid argument")]
     InvalidArgument,
-    #[error("State error")]
+    #[error("State error: {0}")]
     StateError(#[from] StateHandlerError),
     #[error("Transport error")]
     TransportError(#[from] TransportError),
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
 }
 
@@ -63,7 +63,7 @@ impl StateResource<ChaCha20Poly1305> {
                     if let Some(message) = msg {
                         self.handle_device_message(message, &mut transport, &mut grab_request_sender).await?;
                     } else {
-                        eprintln!("Event processor receiver was closed");
+                        eprintln!("Device event processor receiver was closed");
                         return Err(ProcessorError::DeviceChannelClosed);
                     }
                 },

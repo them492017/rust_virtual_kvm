@@ -19,13 +19,13 @@ use super::resource::DeviceResource;
 // TODO: rename error
 #[derive(Debug, Error)]
 pub enum DeviceListenerError {
-    #[error("Device output error")]
+    #[error("Device output error: {0}")]
     DeviceOutputError(#[from] DeviceOutputError),
-    #[error("Device input error")]
+    #[error("Device input error: {0}")]
     DeviceInputError(#[from] DeviceInputError),
-    #[error("Could not send internal message")]
+    #[error("Could not send internal message: {0}")]
     InternalMessageSendError(#[from] SendError<InternalMessage>),
-    #[error("Could not receive grab request")]
+    #[error("Could not receive grab request: {0}")]
     GrabRequestRecvError(#[from] RecvError),
 }
 

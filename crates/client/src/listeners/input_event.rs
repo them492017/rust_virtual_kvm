@@ -9,11 +9,11 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Error)]
 pub enum InputEventListenerError {
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Transport error")]
+    #[error("Transport error: {0}")]
     TransportError(#[from] TransportError),
-    #[error("Transport error")]
+    #[error("Transport error: {0}")]
     DeviceOutputError(#[from] DeviceOutputError),
 }
 

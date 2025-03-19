@@ -57,7 +57,7 @@ impl VirtualDevice for X11VirtualDevice {
         Key::iter()
             .try_for_each(|key| {
                 let event = InputEvent::Keyboard(KeyboardEvent::KeyReleased(key));
-                unsafe { emit(*display, event) }
+                unsafe { emit(*display, event) }; Ok(()) // TODO: temporarily ignore error
             })
             .and(unsafe { flush(*display) })
     }

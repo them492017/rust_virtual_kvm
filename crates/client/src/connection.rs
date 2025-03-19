@@ -15,11 +15,11 @@ use super::listeners::{input_event::input_event_listener, special_event::special
 
 #[derive(Debug, Error)]
 pub enum ConnectionError {
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Transport error")]
+    #[error("Transport error: {0}")]
     TransportError(#[from] TransportError),
-    #[error("Invalid message received from server during connection process")]
+    #[error("Invalid message received from server during connection process: '{0}'")]
     InvalidMessage(String),
     #[error("Shared Diffe-Hellman secret was not contributory")]
     DHContributionError,

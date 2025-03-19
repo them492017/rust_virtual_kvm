@@ -27,17 +27,17 @@ const MAX_RETRIES: u64 = 3;
 
 #[derive(Debug, Error)]
 pub enum ClientHandlerError {
-    #[error("Could not send new client through channel")]
+    #[error("Could not send new client through channel: {0}")]
     ClientSendError(#[from] SendError<Client<ChaCha20Poly1305>>),
-    #[error("Could not connect to client")]
+    #[error("Could not connect to client: {0}")]
     ClientConnectionError(#[from] ConnectionResourceError),
-    #[error("Transport error")]
+    #[error("Transport error: {0}")]
     TransportError(#[from] TransportError),
-    #[error("Could not send internal message through channel")]
+    #[error("Could not send internal message through channel: {0}")]
     InternalMessageSendError(#[from] SendError<InternalMessage>),
     #[error("Could not send heartbeat")]
     HeartbeatFail,
-    #[error("A subtask panicked")]
+    #[error("A subtask panicked: {0}")]
     SubTaskPanickedError(#[from] JoinError),
 }
 

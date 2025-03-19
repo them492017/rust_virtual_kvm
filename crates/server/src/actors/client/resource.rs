@@ -20,9 +20,9 @@ const CHANNEL_BUF_LEN: usize = 256;
 
 #[derive(Debug, Error)]
 pub enum ConnectionResourceError {
-    #[error("Connection error")]
+    #[error("Connection error: {0}")]
     ConnectionError(#[from] ClientConnectionError),
-    #[error("Could not send client to state actor")]
+    #[error("Could not send client to state actor: {0}")]
     ClientSendError(#[from] SendError<Client<ChaCha20Poly1305>>),
 }
 

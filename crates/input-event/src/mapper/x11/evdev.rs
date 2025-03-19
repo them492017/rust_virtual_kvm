@@ -72,7 +72,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
                     2 => crate::KeyboardEvent::KeyHeld(key),
                     _ => {
                         eprintln!("Invalid key event type value: {value:?}");
-                        return Err(EventMappingError::InvalidEventError);
+                        return Err(EventMappingError::InvalidEvent);
                     }
                 }))
             }
@@ -83,7 +83,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
                     crate::PointerAxis::Vertical
                 } else {
                     eprintln!("Invalid relative event axis value: {value:?}");
-                    return Err(EventMappingError::InvalidEventError);
+                    return Err(EventMappingError::InvalidEvent);
                 };
                 Ok(crate::InputEvent::Mouse(crate::MouseEvent::Motion {
                     axis,
@@ -92,7 +92,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
             }
             _ => {
                 eprintln!("Unsupported event type: {value:?}");
-                Err(EventMappingError::UnsupportedEventError)
+                Err(EventMappingError::UnsupportedEventType)
             }
         }
     }

@@ -1,24 +1,22 @@
-use std::fmt;
-
 use serde::{Deserialize, Serialize};
-use strum::EnumIter;
+use strum::{Display, EnumIter};
 
 pub mod mapper;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum InputEvent {
     Keyboard(KeyboardEvent),
     Mouse(MouseEvent),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum KeyboardEvent {
     KeyPressed(Key),
     KeyReleased(Key),
     KeyHeld(Key),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum MouseEvent {
     Motion {
         axis: PointerAxis,
@@ -34,36 +32,27 @@ pub enum MouseEvent {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum PointerAxis {
     Horizontal,
     Vertical,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum KeyboardEventType {
     KeyPressed,
     KeyReleased,
     KeyHeld,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum DeviceType {
     Keyboard,
     Mouse,
 }
 
-impl fmt::Display for DeviceType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DeviceType::Keyboard => write!(f, "Keyboard"),
-            DeviceType::Mouse => write!(f, "Mouse"),
-        }
-    }
-}
-
 #[allow(non_camel_case_types)]
-#[derive(Debug, EnumIter, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, EnumIter, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum Key {
     KEY_ESC,
     KEY_1,

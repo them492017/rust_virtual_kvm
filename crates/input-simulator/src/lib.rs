@@ -6,11 +6,11 @@ pub mod x11;
 
 #[derive(Debug, Error)]
 pub enum DeviceOutputError {
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Event emitting error")]
+    #[error("Event emitting error: {0}")]
     EmitError(String), // TODO: update this
-    #[error("Event conversion error")]
+    #[error("Event conversion error: {0}")]
     ConversionError(#[from] EventMappingError),
 }
 

@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum UIError {
-    #[error("Error in client loop")]
+    #[error("Error in client loop: {0}")]
     ClientError(#[from] ClientError),
 }
 
