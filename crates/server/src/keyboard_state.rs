@@ -2,7 +2,7 @@ use evdev::{EvdevEnum, Key};
 
 const NUM_KEYS: usize = 0x2e7 - 1;
 
-// TODO: move to input-capture crate... should probably include method in exposed trait
+// TODO: move to input-capture crate... should probably include as method in exposed trait
 pub struct KeyboardState {
     mapping: [bool; NUM_KEYS],
 }

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use chacha20poly1305::{aead::OsRng, ChaCha20Poly1305, KeyInit};
 use network::{tcp::TokioTcpTransport, transport::Transport, Message, TransportError};
 use thiserror::Error;
-use tokio::{net::TcpStream, task::JoinHandle};
+use tokio::{net::TcpStream, sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
@@ -138,14 +138,24 @@ impl Connection {
         client_addr: SocketAddr,
     ) -> Result<ListenerHandles, ConnectionError> {
         let key = self.symmetric_key.clone();
+        let (release_request_sender, release_request_receiver) = mpsc::channel(8);
         let cancellation_token = CancellationToken::new();
         let cloned_token = cancellation_token.clone();
+
         let input_event = tokio::spawn(async move {
-            input_event_listener(key, client_addr, server_addr, cloned_token).await
+            input_event_listener(
+                key,
+                client_addr,
+                server_addr,
+                release_request_receiver,
+                cloned_token,
+            )
+            .await
         });
         let cloned_token = cancellation_token.clone();
-        let special_event =
-            tokio::spawn(async move { special_event_processor(transport, cloned_token).await });
+        let special_event = tokio::spawn(async move {
+            special_event_processor(transport, release_request_sender, cloned_token).await
+        });
 
         Ok(ListenerHandles {
             input_event,

@@ -1,10 +1,7 @@
 use std::time::Duration;
 
 use chacha20poly1305::ChaCha20Poly1305;
-use evdev::uinput::VirtualDevice;
-use input_simulator::{
-    x11::dev::make_keyboard, DeviceOutputError, VirtualDevice as VirtualDeviceTrait,
-};
+use input_simulator::DeviceOutputError;
 use network::{
     tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
     transport::{TransportReader, TransportWriter},
@@ -12,7 +9,7 @@ use network::{
 };
 use thiserror::Error;
 use tokio::{
-    sync::mpsc::{self, error::SendError},
+    sync::mpsc::{self, error::SendError, Sender},
     task::JoinError,
 };
 use tokio_util::sync::CancellationToken;
@@ -26,27 +23,33 @@ pub enum SpecialEventProcessorError {
     DeviceOutputError(#[from] DeviceOutputError),
     #[error("Could not send special event")]
     MessageSendError(#[from] SendError<Message>),
+    #[error("Could not send release request")]
+    ReleaseRequesetSendError(#[from] SendError<()>),
     #[error("Transport error")]
     TransportError(#[from] TransportError),
 }
 
 pub async fn special_event_processor(
     transport: TokioTcpTransport<ChaCha20Poly1305>,
+    release_request_sender: Sender<()>,
     cancellation_token: CancellationToken,
 ) -> Result<(), SpecialEventProcessorError> {
-    let virtual_keyboard = make_keyboard().expect("Could not create virtual keyboard");
-
     let (read_transport, write_transport) = transport.into_split();
-    let (tx, rx) = mpsc::channel(8);
+    let (message_sender, message_receiver) = mpsc::channel(8);
 
     let cloned_token = cancellation_token.clone();
     let listener = tokio::spawn(async move {
-        special_event_listener(read_transport, tx, virtual_keyboard, cloned_token).await
+        special_event_listener(
+            read_transport,
+            message_sender,
+            release_request_sender,
+            cloned_token,
+        )
+        .await
     });
-    let sender =
-        tokio::spawn(
-            async move { special_event_sender(write_transport, rx, cancellation_token).await },
-        );
+    let sender = tokio::spawn(async move {
+        special_event_sender(write_transport, message_receiver, cancellation_token).await
+    });
 
     tokio::select! {
         result = listener => {
@@ -61,8 +64,8 @@ pub async fn special_event_processor(
 
 pub async fn special_event_listener(
     mut reader: TokioTcpTransportReader<ChaCha20Poly1305>,
-    sender: mpsc::Sender<Message>,
-    mut virtual_keyboard: VirtualDevice,
+    message_sender: mpsc::Sender<Message>,
+    release_request_sender: Sender<()>,
     cancellation_token: CancellationToken,
 ) -> Result<(), SpecialEventProcessorError> {
     loop {
@@ -72,12 +75,12 @@ pub async fn special_event_listener(
                         match event {
                             Message::ClipboardChanged { content } => {
                                 println!("New clipboard item: [{:?}]", content);
-                                sender.send(Message::ExchangePubKeyResponse).await?; // TODO: temporary response
+                                message_sender.send(Message::ExchangePubKeyResponse).await?; // TODO: temporary response
                             }
                             Message::TargetChangeNotification => {
                                 println!("Releasing all keys");
-                                virtual_keyboard.release_all()?;
-                                sender.send(Message::TargetChangeResponse).await?;
+                                release_request_sender.send(()).await?;
+                                message_sender.send(Message::TargetChangeResponse).await?;
                             }
                             Message::Heartbeat => {}
                             _ => {
@@ -101,13 +104,13 @@ pub async fn special_event_listener(
 
 pub async fn special_event_sender(
     mut writer: TokioTcpTransportWriter<ChaCha20Poly1305>,
-    mut receiver: mpsc::Receiver<Message>,
+    mut message_receiver: mpsc::Receiver<Message>,
     cancellation_token: CancellationToken,
 ) -> Result<(), SpecialEventProcessorError> {
     let timeout = Duration::from_secs(3);
     loop {
         tokio::select! {
-            Some(message) = receiver.recv() => {
+            Some(message) = message_receiver.recv() => {
                 writer.send_message(message).await?;
             },
             _ = tokio::time::sleep(timeout) => {
