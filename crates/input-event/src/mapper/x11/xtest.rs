@@ -8,7 +8,13 @@ use x11::{
 use crate::{mapper::error::EventMappingError, Key};
 
 impl Key {
-    pub fn to_x11_keycode(self, display: *mut Display) -> Result<c_uchar, EventMappingError> {
+    /// # Safety
+    ///
+    /// This function should always be called with a valid pointer to an X11 Display
+    pub unsafe fn to_x11_keycode(
+        self,
+        display: *mut Display,
+    ) -> Result<c_uchar, EventMappingError> {
         let keysym = match self {
             Key::KEY_ESC => keysym::XK_Escape,
             Key::KEY_1 => keysym::XK_1,
@@ -111,8 +117,6 @@ impl Key {
             _ => return Err(EventMappingError::UnsupportedKeyError), // TODO: maybe change
         };
 
-        unsafe {
-            Ok(XKeysymToKeycode(display, keysym.into()))
-        }
+        unsafe { Ok(XKeysymToKeycode(display, keysym.into())) }
     }
 }

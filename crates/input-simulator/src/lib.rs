@@ -20,7 +20,7 @@ pub trait VirtualDevice: Send {
 }
 
 pub struct InputSimulator {
-    virtual_device: Box<dyn VirtualDevice + Send>,
+    virtual_device: Box<dyn VirtualDevice + Send + Sync>,
 }
 
 impl InputSimulator {

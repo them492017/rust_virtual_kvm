@@ -2,36 +2,35 @@ use std::time::Duration;
 
 use chacha20poly1305::ChaCha20Poly1305;
 use network::{
-    tcp::{TokioTcpTransport, TokioTcpTransportReader, TokioTcpTransportWriter},
+    tcp::{TokioTcpTransportReader, TokioTcpTransportWriter},
     transport::{TransportReader, TransportWriter},
     Message, TransportError,
 };
 use thiserror::Error;
 use tokio::{
-    net::TcpStream,
-    sync::mpsc::{self, error::SendError, Receiver, Sender},
+    sync::mpsc::{error::SendError, Receiver},
     task::JoinError,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{
-    client::{Client, ClientConnectionError, Connection},
-    handlers::client_message_sender::ClientMessageSender,
-    InternalMessage, ServerMessage,
+use crate::{actors::state::client::Client, InternalMessage, ServerMessage};
+
+use super::{
+    client_message_sender::ClientMessageSender,
+    resource::{ConnectionResource, ConnectionResourceError},
 };
 
 // TODO: refactor to a common location
 const HEARTBEAT_INTERVAL: u64 = 3;
 const MAX_RETRIES: u64 = 3;
-const CHANNEL_BUF_LEN: usize = 256;
 
 #[derive(Debug, Error)]
 pub enum ClientHandlerError {
     #[error("Could not send new client through channel")]
     ClientSendError(#[from] SendError<Client<ChaCha20Poly1305>>),
     #[error("Could not connect to client")]
-    ClientConnectionError(#[from] ClientConnectionError),
+    ClientConnectionError(#[from] ConnectionResourceError),
     #[error("Transport error")]
     TransportError(#[from] TransportError),
     #[error("Could not send internal message through channel")]
@@ -42,66 +41,37 @@ pub enum ClientHandlerError {
     SubTaskPanickedError(#[from] JoinError),
 }
 
-pub async fn handle_client(
-    stream: TcpStream,
-    client_sender: Sender<Client<ChaCha20Poly1305>>,
-    client_message_sender: Sender<InternalMessage>,
-    cancellation_token: CancellationToken,
-) -> Result<(), ClientHandlerError> {
-    let mut transport = TokioTcpTransport::new(stream);
-    let (message_sender, message_receiver) = mpsc::channel(CHANNEL_BUF_LEN);
-    let client: Client<ChaCha20Poly1305> = Client::connect(&mut transport, message_sender).await?;
+impl ConnectionResource<ChaCha20Poly1305> {
+    pub async fn process_events(
+        self,
+        cancellation_token: CancellationToken,
+    ) -> Result<(), ClientHandlerError> {
+        let client_message_sender = ClientMessageSender::new(self.id, self.client_message_sender);
+        let client_message_sender_clone = client_message_sender.clone();
+        let listener = tokio::spawn(async move {
+            tcp_listener(self.transport_reader, client_message_sender_clone).await
+        });
+        let sender = tokio::spawn(async move {
+            tcp_sender(
+                self.id,
+                self.transport_writer,
+                self.message_receiver,
+                client_message_sender,
+            )
+            .await
+        });
 
-    // send client to event processor
-    let id = client.id;
-    client_sender.send(client).await?;
-
-    process_events(
-        id,
-        transport,
-        message_receiver,
-        client_message_sender,
-        cancellation_token,
-    )
-    .await
-}
-
-// TODO: make a client actor + resource
-async fn process_events(
-    id: Uuid,
-    transport: TokioTcpTransport<ChaCha20Poly1305>,
-    message_receiver: Receiver<Message>,
-    client_message_sender: Sender<InternalMessage>,
-    cancellation_token: CancellationToken,
-) -> Result<(), ClientHandlerError> {
-    let (reader_transport, writer_transport) = transport.into_split();
-
-    let client_message_sender = ClientMessageSender::new(id, client_message_sender);
-    let client_message_sender_clone = client_message_sender.clone();
-    let listener =
-        tokio::spawn(
-            async move { tcp_listener(reader_transport, client_message_sender_clone).await },
-        );
-    let sender = tokio::spawn(async move {
-        tcp_sender(
-            id,
-            writer_transport,
-            message_receiver,
-            client_message_sender,
-        )
-        .await
-    });
-
-    tokio::select! {
-        result = listener => {
-            result?
-        },
-        result = sender => {
-            result?
-        },
-        _ = cancellation_token.cancelled() => {
-            Ok(())
-        },
+        tokio::select! {
+            result = listener => {
+                result?
+            },
+            result = sender => {
+                result?
+            },
+            _ = cancellation_token.cancelled() => {
+                Ok(())
+            },
+        }
     }
 }
 

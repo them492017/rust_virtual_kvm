@@ -4,7 +4,7 @@ use thiserror::Error;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::client::{Client, ClientConnectionError};
+use super::client::{Client, ClientConnectionError};
 
 #[derive(Debug, Error)]
 pub enum StateHandlerError {
@@ -233,7 +233,7 @@ pub mod test {
         use network::Message;
         use tokio::sync::mpsc;
 
-        use crate::{actors::state::resource::StateResource, client::test::test_client_fixture};
+        use crate::actors::state::{client::test::test_client_fixture, resource::StateResource};
 
         pub fn test_state_fixture(
             client_channels: Vec<mpsc::Sender<Message>>,

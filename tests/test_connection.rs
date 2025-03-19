@@ -1,7 +1,7 @@
 use std::{error::Error, net::SocketAddr, time::Duration};
 
 use client::connection::Connection;
-use server::server::start_listening;
+use server::actors::server::resource::ServerResource;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -20,6 +20,8 @@ async fn given_matching_ip_addresses_should_successfully_form_a_connection() {
     let client_addr: SocketAddr = "127.0.0.1:15342".parse().unwrap();
     let server_addr: SocketAddr = "127.0.0.1:15343".parse().unwrap();
 
+    let server = ServerResource::new(server_addr).await;
+
     let (client_sender, _rx1) = mpsc::channel(10);
     let (client_message_sender, _rx2) = mpsc::channel(10);
 
@@ -27,13 +29,9 @@ async fn given_matching_ip_addresses_should_successfully_form_a_connection() {
 
     // When
     tokio::spawn(async move {
-        start_listening(
-            server_addr,
-            client_sender,
-            client_message_sender,
-            cancellation_token,
-        )
-        .await
+        server
+            .start_listening(client_sender, client_message_sender, cancellation_token)
+            .await
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
     let response = connect_client(client_addr, server_addr).await;

@@ -2,10 +2,7 @@ use network::Message;
 use uuid::Uuid;
 
 pub mod actors;
-pub mod client;
-pub mod handlers;
 pub mod keyboard_state;
-pub mod server;
 pub mod server_loop;
 
 #[derive(Debug)]

@@ -2,11 +2,16 @@ use chacha20poly1305::ChaCha20Poly1305;
 use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 
-use crate::{client::Client, handlers::client::handle_client, InternalMessage};
+use crate::{
+    actors::{
+        client::{actor::ClientHandlerError, resource::ConnectionResource},
+        state::client::Client,
+    },
+    InternalMessage,
+};
 
 use super::resource::ServerResource;
 
-// TODO: rename and move to actor module
 impl ServerResource {
     pub async fn start_listening(
         self,
@@ -20,19 +25,25 @@ impl ServerResource {
 
             let client_sender_clone = client_sender.clone();
             let client_message_sender_clone = client_message_sender.clone();
-            let cancellation_token_clone = cancellation_token.clone();
+            let cancellation_token_clone1 = cancellation_token.clone();
+            let cancellation_token_clone2 = cancellation_token.clone();
 
             tokio::spawn(async move {
-                // TODO: move this handling function into this file
-                if let Err(err) = handle_client(
-                    socket,
-                    client_sender_clone,
-                    client_message_sender_clone,
-                    cancellation_token_clone,
-                )
-                .await
-                {
-                    eprintln!("Error handling client: {}", err);
+                let result: Result<(), ClientHandlerError> = async {
+                    let connection = ConnectionResource::new(
+                        socket,
+                        client_sender_clone,
+                        client_message_sender_clone,
+                    )
+                    .await?;
+                    connection.process_events(cancellation_token_clone1).await?;
+                    Ok(())
+                }
+                .await;
+
+                if let Err(err) = result {
+                    eprintln!("Error processing client events: {}", err);
+                    cancellation_token_clone2.cancel();
                 }
             });
         }

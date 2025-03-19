@@ -1,3 +1,3 @@
 pub mod actor;
-pub mod client;
+mod client_message_sender;
 pub mod resource;

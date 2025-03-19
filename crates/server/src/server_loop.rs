@@ -3,18 +3,16 @@ use std::net::SocketAddr;
 use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    actors::{device::resource::DeviceResource, state::resource::StateResource},
-    server::start_listening,
+use crate::actors::{
+    device::resource::DeviceResource, server::resource::ServerResource,
+    state::resource::StateResource,
 };
 
 pub async fn run(server_addr: SocketAddr) {
     let (event_tx1, event_rx) = mpsc::channel(32);
-    let event_tx2 = event_tx1.clone();
     let (client_tx, client_rx) = mpsc::channel(32);
     let (client_message_tx, client_message_rx) = mpsc::channel(32);
     let (grab_request_tx, grab_request_rx1) = broadcast::channel(32);
-    let grab_request_rx2 = grab_request_tx.subscribe();
     let cancellation_token = CancellationToken::new();
 
     let cancellation_token_clone = cancellation_token.clone();
@@ -32,43 +30,33 @@ pub async fn run(server_addr: SocketAddr) {
             .await
     });
 
-    let kbd_devices = DeviceResource::new("Keyboard");
+    let devices = DeviceResource::new();
     let cancellation_token_clone = cancellation_token.clone();
-    let kbd_listener = tokio::spawn(async move {
-        kbd_devices
+    let device_listener = tokio::spawn(async move {
+        devices
             .start_device_listener(event_tx1, grab_request_rx1, cancellation_token_clone)
             .await
     });
-    let mouse_devices = DeviceResource::new("Mouse");
-    let cancellation_token_clone = cancellation_token.clone();
-    let mouse_listener = tokio::spawn(async move {
-        mouse_devices
-            .start_device_listener(event_tx2, grab_request_rx2, cancellation_token_clone)
-            .await
-    });
 
-    println!("Starting server");
+    let server = ServerResource::new(server_addr).await;
     let client_tx_clone = client_tx.clone();
     let cancellation_token_clone = cancellation_token.clone();
+    let server_actor =
+        server.start_listening(client_tx_clone, client_message_tx, cancellation_token_clone);
+
+    println!("Initialised server");
     tokio::select! {
-            result = start_listening(server_addr, client_tx_clone, client_message_tx, cancellation_token_clone) => {
-                match result {
-                    Ok(()) => println!("Server closed gracefully"),
-                    Err(err) => eprintln!("Server exited with error: {}", err),
+        result = server_actor => {
+            match result {
+                Ok(()) => println!("Server closed gracefully"),
+                Err(err) => eprintln!("Server exited with error: {}", err),
             }
         },
-        result = kbd_listener => {
+        result = device_listener => {
             match result {
-                Ok(Ok(())) => println!("Keyboard listener closed gracefully"),
-                Ok(Err(err)) => eprintln!("Keyboard listener exited with error: {}", err),
-                Err(err) => eprintln!("Keyboard listener panicked: {}", err),
-            }
-        },
-        result = mouse_listener => {
-            match result {
-                Ok(Ok(())) => println!("Mouse listener closed gracefully"),
-                Ok(Err(err)) => eprintln!("Mouse listener exited with error: {}", err),
-                Err(err) => eprintln!("Mouse listener panicked: {}", err),
+                Ok(Ok(())) => println!("Device listener closed gracefully"),
+                Ok(Err(err)) => eprintln!("Device listener exited with error: {}", err),
+                Err(err) => eprintln!("Device listener panicked: {}", err),
             }
         },
         result = event_processor => {

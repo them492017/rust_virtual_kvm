@@ -36,12 +36,13 @@ impl DeviceResource {
         mut grab_request_receiver: broadcast::Receiver<bool>,
         cancellation_token: CancellationToken,
     ) -> Result<(), DeviceListenerError> {
-        println!("Starting device listener for {}", "[INSERT DEV NAME HERE]"); // TODO: add name
+        println!("Starting device listeners"); // TODO: add names of devices
         let mut keyboard_state = KeyboardState::default();
 
         loop {
             tokio::select! {
-                event = self.input_stream.next_event() => {
+                // TODO: consider merging the two streams to avoid code repitition
+                event = self.kbd_input_stream.next_event() => {
                     match event {
                         Ok(event) => {
                             if let InputEvent::Keyboard(keyboard_event) = event {
@@ -71,14 +72,46 @@ impl DeviceResource {
                         },
                     }
                 },
+                event = self.mouse_input_stream.next_event() => {
+                    match event {
+                        Ok(event) => {
+                            // if let InputEvent::Keyboard(keyboard_event) = event {
+                            //     match keyboard_event {
+                            //         KeyboardEvent::KeyPressed(key) => {
+                            //             // TODO: make keyboard_state use the generic input_event::Key enum
+                            //             // instead of coupling it to evdev
+                            //             keyboard_state.press_key(key.into());
+                            //             // handle combinations
+                            //             self.handle_combinations(&mut keyboard_state, &event_sender).await?;
+                            //         }
+                            //         KeyboardEvent::KeyReleased(key) => {
+                            //             keyboard_state.release_key(key.into());
+                            //         }
+                            //         _ => {}
+                            //     }
+                            // }
+                            let message = InternalMessage::ClientMessage {
+                                message: Message::InputEvent { event },
+                                sender: None,
+                            };
+                            event_sender.send(message).await?;
+                        },
+                        Err(DeviceInputError::InputEventConversionError(_)) => {},
+                        Err(err) => {
+                            return Err(err.into())
+                        },
+                    }
+                },
                 request = grab_request_receiver.recv() => {
                     match request {
                         Ok(true) => {
-                            self.virtual_kbd.release_all()?;
-                            self.input_stream.grab_device()?;
+                            self.kbd_input_stream.grab_device()?;
+                            self.mouse_input_stream.grab_device()?;
+                            self.input_simulator.release_all()?;
                         },
                         Ok(false) => {
-                            self.input_stream.ungrab_device()?;
+                            self.kbd_input_stream.ungrab_device()?;
+                            self.mouse_input_stream.ungrab_device()?;
                         },
                         Err(err) => {
                             eprintln!("Grab request receive had an error: {}", err);
@@ -87,7 +120,7 @@ impl DeviceResource {
                     }
                 },
                 _ = cancellation_token.cancelled() => {
-                    self.virtual_kbd.release_all()?;
+                    self.input_simulator.release_all()?;
                     return Ok(())
                 },
             }

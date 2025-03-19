@@ -15,6 +15,7 @@ pub enum DeviceInputError {
 }
 
 // TODO: Consider making a sync version
+// TODO: Consider implementing the Stream<Item = Result<InputEvent, DeviceInputError>> trait
 pub trait DeviceInputStreamTrait: Send {
     fn next_event(
         &mut self,

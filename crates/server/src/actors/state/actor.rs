@@ -9,9 +9,12 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{client::Client, InternalMessage, ServerMessage};
+use crate::{InternalMessage, ServerMessage};
 
-use super::resource::{StateHandlerError, StateResource};
+use super::{
+    client::Client,
+    resource::{StateHandlerError, StateResource},
+};
 
 #[derive(Debug, Error)]
 pub enum ProcessorError {
