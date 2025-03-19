@@ -1,16 +1,24 @@
-use std::ffi::c_uchar;
+use std::ffi::{c_uchar, c_uint};
 
 use x11::{
     keysym,
     xlib::{Display, XKeysymToKeycode},
 };
 
-use crate::{mapper::error::EventMappingError, Key};
+use crate::{mapper::error::EventMappingError, Button, Key, PointerAxis};
 
 impl Key {
-    /// # Safety
+    /// Converts a `Key` to an X11 keycode using the provided display.
     ///
-    /// This function should always be called with a valid pointer to an X11 Display
+    /// # Parameters
+    /// - `display`: A pointer to an X11 `Display`
+    ///
+    /// # Returns
+    /// - `Ok(c_uchar)`: The corresponding X11 keycode.
+    /// - `Err(EventMappingError)`: If the mapping fails.
+    ///
+    /// # Safety
+    /// This function assumes the provided `display` pointer is valid and properly initialized.
     pub unsafe fn to_x11_keycode(
         self,
         display: *mut Display,
@@ -114,9 +122,50 @@ impl Key {
             Key::KEY_LEFTMETA => keysym::XK_Super_L,
             Key::KEY_RIGHTMETA => keysym::XK_Super_R,
             Key::KEY_MENU => keysym::XK_Menu,
-            _ => return Err(EventMappingError::UnsupportedKeyError(self)), // TODO: maybe change
         };
 
         unsafe { Ok(XKeysymToKeycode(display, keysym.into())) }
+    }
+}
+
+impl Button {
+    /// Converts a `Button` to its corresponding X11 button number.
+    ///
+    /// # Returns
+    /// - X11 button number for the given button:
+    ///   - **Left Button:** `1`
+    ///   - **Right Button:** `3`
+    ///   - **Middle Button:** `2`
+    ///   - **Forward Button:** `9`
+    ///   - **Back Button:** `8`
+    pub fn to_x11_button_num(self) -> c_uint {
+        match self {
+            Button::BTN_LEFT => 1,
+            Button::BTN_RIGHT => 3,
+            Button::BTN_MIDDLE => 2,
+            Button::BTN_FORWARD => 9,
+            Button::BTN_BACK => 8,
+        }
+    }
+}
+
+impl PointerAxis {
+    /// Converts a scroll direction into the corresponding X11 button number.
+    ///
+    /// # Parameters
+    /// - `direction`: `true` for positive direction (up or right), `false` for negative direction (down or left).
+    ///
+    /// # Returns
+    /// - The X11 button number corresponding to the given axis and direction:
+    ///   - **Vertical:** Up (`4`), Down (`5`)
+    ///   - **Horizontal:** Right (`7`), Left (`6`)
+    pub fn to_x11_button_num(self, direction: bool) -> c_uint {
+        use PointerAxis::*;
+        match self {
+            Vertical if direction => 4,
+            Vertical => 5,
+            Horizontal if direction => 7,
+            Horizontal => 6,
+        }
     }
 }

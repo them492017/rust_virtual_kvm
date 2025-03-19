@@ -12,7 +12,6 @@ pub enum StateHandlerError {
     ClientDisconnected,
     #[error("Client not found")]
     NotFound,
-    // TODO: consider separating idx error
     #[error("Grab request channel send error: {0}")]
     GrabSendError(#[from] tokio::sync::broadcast::error::SendError<bool>),
     #[error("Grab request channel send error: {0}")]

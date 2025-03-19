@@ -24,7 +24,7 @@ pub enum MouseEvent {
     },
     Button {
         event_type: KeyboardEventType,
-        button: Key,
+        button: Button,
     },
     Scroll {
         axis: PointerAxis,
@@ -51,6 +51,7 @@ pub enum DeviceType {
     Mouse,
 }
 
+// TODO: delete some extra keys that arent used (eg KEY_KP_x)
 #[allow(non_camel_case_types)]
 #[derive(Debug, EnumIter, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 pub enum Key {
@@ -152,11 +153,14 @@ pub enum Key {
     KEY_LEFTMETA,
     KEY_RIGHTMETA,
     KEY_MENU,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, EnumIter, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
+pub enum Button {
     BTN_LEFT,
     BTN_RIGHT,
     BTN_MIDDLE,
-    BTN_SIDE,
-    BTN_EXTRA,
     BTN_FORWARD,
     BTN_BACK,
 }

@@ -64,7 +64,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
     fn try_from(value: evdev::InputEvent) -> Result<Self, Self::Error> {
         match value.event_type() {
             evdev::EventType::KEY => {
-                let key = evdev::Key::new(value.code()).into();
+                let key = evdev::Key::new(value.code()).try_into()?;
                 // TODO: button events should be mapped to a MouseEvent
                 Ok(crate::InputEvent::Keyboard(match value.value() {
                     0 => crate::KeyboardEvent::KeyReleased(key),
@@ -216,20 +216,27 @@ impl From<crate::Key> for evdev::Key {
             crate::Key::KEY_LEFTMETA => evdev::Key::KEY_LEFTMETA,
             crate::Key::KEY_RIGHTMETA => evdev::Key::KEY_RIGHTMETA,
             crate::Key::KEY_MENU => evdev::Key::KEY_MENU,
-            crate::Key::BTN_LEFT => evdev::Key::BTN_LEFT,
-            crate::Key::BTN_RIGHT => evdev::Key::BTN_RIGHT,
-            crate::Key::BTN_MIDDLE => evdev::Key::BTN_MIDDLE,
-            crate::Key::BTN_SIDE => evdev::Key::BTN_SIDE,
-            crate::Key::BTN_EXTRA => evdev::Key::BTN_EXTRA,
-            crate::Key::BTN_FORWARD => evdev::Key::BTN_FORWARD,
-            crate::Key::BTN_BACK => evdev::Key::BTN_BACK,
         }
     }
 }
 
-impl From<evdev::Key> for crate::Key {
-    fn from(val: evdev::Key) -> Self {
-        match val {
+impl From<crate::Button> for evdev::Key {
+    fn from(value: crate::Button) -> Self {
+        match value {
+            crate::Button::BTN_LEFT => evdev::Key::BTN_LEFT,
+            crate::Button::BTN_RIGHT => evdev::Key::BTN_RIGHT,
+            crate::Button::BTN_MIDDLE => evdev::Key::BTN_MIDDLE,
+            crate::Button::BTN_FORWARD => evdev::Key::BTN_FORWARD,
+            crate::Button::BTN_BACK => evdev::Key::BTN_BACK,
+        }
+    }
+}
+
+impl TryFrom<evdev::Key> for crate::Key {
+    type Error = EventMappingError;
+
+    fn try_from(val: evdev::Key) -> Result<crate::Key, Self::Error> {
+        Ok(match val {
             evdev::Key::KEY_ESC => crate::Key::KEY_ESC,
             evdev::Key::KEY_1 => crate::Key::KEY_1,
             evdev::Key::KEY_2 => crate::Key::KEY_2,
@@ -328,14 +335,28 @@ impl From<evdev::Key> for crate::Key {
             evdev::Key::KEY_LEFTMETA => crate::Key::KEY_LEFTMETA,
             evdev::Key::KEY_RIGHTMETA => crate::Key::KEY_RIGHTMETA,
             evdev::Key::KEY_MENU => crate::Key::KEY_MENU,
-            evdev::Key::BTN_LEFT => crate::Key::BTN_LEFT,
-            evdev::Key::BTN_RIGHT => crate::Key::BTN_RIGHT,
-            evdev::Key::BTN_MIDDLE => crate::Key::BTN_MIDDLE,
-            evdev::Key::BTN_SIDE => crate::Key::BTN_SIDE,
-            evdev::Key::BTN_EXTRA => crate::Key::BTN_EXTRA,
-            evdev::Key::BTN_FORWARD => crate::Key::BTN_FORWARD,
-            evdev::Key::BTN_BACK => crate::Key::BTN_BACK,
-            _ => unimplemented!("Unsupported key {val:?}"),
-        }
+            _ => {
+                eprintln!("evdev key {val:?} is not a key");
+                return Err(EventMappingError::UnknownKey);
+            }
+        })
+    }
+}
+
+impl TryFrom<evdev::Key> for crate::Button {
+    type Error = EventMappingError;
+
+    fn try_from(val: evdev::Key) -> Result<crate::Button, Self::Error> {
+        Ok(match val {
+            evdev::Key::BTN_LEFT => crate::Button::BTN_LEFT,
+            evdev::Key::BTN_RIGHT => crate::Button::BTN_RIGHT,
+            evdev::Key::BTN_MIDDLE => crate::Button::BTN_MIDDLE,
+            evdev::Key::BTN_FORWARD => crate::Button::BTN_FORWARD,
+            evdev::Key::BTN_BACK => crate::Button::BTN_BACK,
+            _ => {
+                eprintln!("evdev key {val:?} is not a button");
+                return Err(EventMappingError::UnknownButton);
+            }
+        })
     }
 }

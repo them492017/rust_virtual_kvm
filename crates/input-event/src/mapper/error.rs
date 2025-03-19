@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{InputEvent, Key, KeyboardEventType};
+use crate::Key;
 
 #[derive(Debug, Error)]
 pub enum EventMappingError {
@@ -10,4 +10,8 @@ pub enum EventMappingError {
     UnsupportedKeyError(Key),
     #[error("Error when mapping an invalid event")]
     InvalidEvent,
+    #[error("Argument could not be mapped to a key")]
+    UnknownKey,
+    #[error("Argument could not be mapped to a button")]
+    UnknownButton,
 }

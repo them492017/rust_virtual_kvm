@@ -1,15 +1,16 @@
 use std::{ptr, sync::Mutex};
 
-use input_event::{InputEvent, Key, KeyboardEvent};
+use input_event::{InputEvent, Key, KeyboardEvent, KeyboardEventType};
 use strum::IntoEnumIterator;
 use x11::{
     xlib::{self, Display, XCloseDisplay, XFlush, XOpenDisplay},
-    xtest::{XTestFakeKeyEvent, XTestFakeRelativeMotionEvent},
+    xtest::{XTestFakeButtonEvent, XTestFakeKeyEvent, XTestFakeRelativeMotionEvent},
 };
 
 use crate::{DeviceOutputError, VirtualDevice};
 
 pub(crate) struct X11VirtualDevice {
+    // TODO: probably can remove the mutex since it is only ever used in one thread
     display: Mutex<*mut Display>, // TODO: Consider the use of a blocking lock with tokio
 }
 
@@ -57,7 +58,7 @@ impl VirtualDevice for X11VirtualDevice {
         Key::iter()
             .try_for_each(|key| {
                 let event = InputEvent::Keyboard(KeyboardEvent::KeyReleased(key));
-                unsafe { emit(*display, event) }; Ok(()) // TODO: temporarily ignore error
+                unsafe { emit(*display, event) }
             })
             .and(unsafe { flush(*display) })
     }
@@ -95,8 +96,35 @@ unsafe fn emit(display: *mut Display, event: InputEvent) -> Result<(), DeviceOut
                     }
                 }
             }
-            input_event::MouseEvent::Button { event_type, button } => todo!(),
-            input_event::MouseEvent::Scroll { axis, diff } => todo!(),
+            input_event::MouseEvent::Button { event_type, button } => {
+                let is_press = match event_type {
+                    KeyboardEventType::KeyPressed | KeyboardEventType::KeyHeld => 1,
+                    KeyboardEventType::KeyReleased => 0,
+                };
+                let button = button.to_x11_button_num();
+                unsafe {
+                    if XTestFakeButtonEvent(display, button, is_press, 0) == 0 {
+                        eprintln!("Could not emit Xtest fake motion event");
+                        return Err(DeviceOutputError::EmitError(
+                            "Could not emit Xtest fake key event".into(),
+                        ));
+                    }
+                }
+            }
+            input_event::MouseEvent::Scroll { axis, diff } => {
+                let is_press = 1;
+                let button = axis.to_x11_button_num(diff > 0);
+                unsafe {
+                    for _ in 0..diff {
+                        if XTestFakeButtonEvent(display, button, is_press, 0) == 0 {
+                            eprintln!("Could not emit Xtest fake motion event");
+                            return Err(DeviceOutputError::EmitError(
+                                "Could not emit Xtest fake key event".into(),
+                            ));
+                        }
+                    }
+                }
+            }
         },
     }
     Ok(())
