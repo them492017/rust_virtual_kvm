@@ -1,4 +1,8 @@
-use std::{ptr, sync::Mutex};
+use std::{
+    ffi::{c_uint, c_ulong},
+    ptr,
+    sync::Mutex,
+};
 
 use input_event::{InputEvent, Key, KeyboardEvent, KeyboardEventType};
 use strum::IntoEnumIterator;
@@ -118,20 +122,36 @@ unsafe fn emit(display: *mut Display, event: InputEvent) -> Result<(), DeviceOut
                 }
             }
             input_event::MouseEvent::Scroll { axis, diff } => {
-                let is_press = 1;
                 let button = axis.to_x11_button_num(diff > 0);
                 unsafe {
                     for _ in 0..diff.abs() {
-                        if XTestFakeButtonEvent(display, button, is_press, 0) == 0 {
-                            eprintln!("Could not emit Xtest fake motion event");
-                            return Err(DeviceOutputError::EmitError(
-                                "Could not emit Xtest fake key event".into(),
-                            ));
-                        }
+                        tap_button(display, button, 0)?;
                     }
                 }
             }
         },
+    }
+    Ok(())
+}
+
+unsafe fn tap_button(
+    display: *mut Display,
+    button: c_uint,
+    delay: c_ulong,
+) -> Result<(), DeviceOutputError> {
+    let is_press = 1;
+    if XTestFakeButtonEvent(display, button, is_press, delay) == 0 {
+        eprintln!("Could not emit Xtest fake motion event");
+        return Err(DeviceOutputError::EmitError(
+            "Could not emit Xtest fake key event".into(),
+        ));
+    }
+    let is_press = 0;
+    if XTestFakeButtonEvent(display, button, is_press, delay) == 0 {
+        eprintln!("Could not emit Xtest fake motion event");
+        return Err(DeviceOutputError::EmitError(
+            "Could not emit Xtest fake key event".into(),
+        ));
     }
     Ok(())
 }

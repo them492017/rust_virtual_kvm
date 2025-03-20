@@ -3,13 +3,11 @@ use crate::{mapper::error::EventMappingError, Button};
 impl From<crate::InputEvent> for evdev::InputEvent {
     fn from(value: crate::InputEvent) -> Self {
         match value {
-            crate::InputEvent::Keyboard(event) => {
-                evdev::InputEvent::new(
-                    evdev::EventType::KEY,
-                    evdev::Key::from(event.key).code(),
-                    to_evdev_value(event.event_type),
-                )
-            },
+            crate::InputEvent::Keyboard(event) => evdev::InputEvent::new(
+                evdev::EventType::KEY,
+                evdev::Key::from(event.key).code(),
+                to_evdev_value(event.event_type),
+            ),
             crate::InputEvent::Mouse(event) => match event {
                 crate::MouseEvent::Motion { axis, diff } => match axis {
                     crate::PointerAxis::Horizontal => evdev::InputEvent::new(
@@ -64,11 +62,13 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
                         return Err(EventMappingError::InvalidEvent);
                     }
                 };
-                if let Ok(button) = std::convert::TryInto::<Button>::try_into(evdev::Key::new(value.code())) {
+                if let Ok(button) =
+                    std::convert::TryInto::<Button>::try_into(evdev::Key::new(value.code()))
+                {
                     return Ok(crate::InputEvent::Mouse(crate::MouseEvent::Button {
                         event_type,
                         button,
-                    }))
+                    }));
                 }
                 let key: crate::Key = evdev::Key::new(value.code()).try_into()?;
                 Ok(crate::InputEvent::Keyboard(crate::KeyboardEvent {

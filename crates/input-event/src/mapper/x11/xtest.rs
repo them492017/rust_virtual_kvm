@@ -172,6 +172,5 @@ impl PointerAxis {
 #[cfg(test)]
 mod test {
     #[test]
-    fn given_some_key_should_map_to_corresponding_x11_keycode() {
-    }
+    fn given_some_key_should_map_to_corresponding_x11_keycode() {}
 }
