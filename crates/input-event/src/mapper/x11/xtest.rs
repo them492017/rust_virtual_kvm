@@ -160,12 +160,18 @@ impl PointerAxis {
     ///   - **Vertical:** Up (`4`), Down (`5`)
     ///   - **Horizontal:** Right (`7`), Left (`6`)
     pub fn to_x11_button_num(self, direction: bool) -> c_uint {
-        use PointerAxis::*;
         match self {
-            Vertical if direction => 4,
-            Vertical => 5,
-            Horizontal if direction => 7,
-            Horizontal => 6,
+            PointerAxis::Vertical if direction => 4,
+            PointerAxis::Vertical => 5,
+            PointerAxis::Horizontal if direction => 7,
+            PointerAxis::Horizontal => 6,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn given_some_key_should_map_to_corresponding_x11_keycode() {
     }
 }

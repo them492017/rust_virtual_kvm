@@ -82,7 +82,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
                 } else if value.code() == evdev::RelativeAxisType::REL_Y.0 {
                     (crate::PointerAxis::Vertical, true)
                 } else if value.code() == evdev::RelativeAxisType::REL_WHEEL.0 {
-                    (crate::PointerAxis::Horizontal, false)
+                    (crate::PointerAxis::Vertical, false)
                 } else {
                     eprintln!("Invalid relative event axis value: {value:?}");
                     return Err(EventMappingError::InvalidEvent);
@@ -336,7 +336,6 @@ impl TryFrom<evdev::Key> for crate::Key {
             evdev::Key::KEY_RIGHTMETA => crate::Key::KEY_RIGHTMETA,
             evdev::Key::KEY_MENU => crate::Key::KEY_MENU,
             _ => {
-                eprintln!("evdev key {val:?} is not a key");
                 return Err(EventMappingError::UnknownKey);
             }
         })
@@ -354,7 +353,6 @@ impl TryFrom<evdev::Key> for crate::Button {
             evdev::Key::BTN_FORWARD => crate::Button::BTN_FORWARD,
             evdev::Key::BTN_BACK => crate::Button::BTN_BACK,
             _ => {
-                eprintln!("evdev key {val:?} is not a button");
                 return Err(EventMappingError::UnknownButton);
             }
         })

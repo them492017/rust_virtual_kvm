@@ -121,7 +121,7 @@ unsafe fn emit(display: *mut Display, event: InputEvent) -> Result<(), DeviceOut
                 let is_press = 1;
                 let button = axis.to_x11_button_num(diff > 0);
                 unsafe {
-                    for _ in 0..diff {
+                    for _ in 0..diff.abs() {
                         if XTestFakeButtonEvent(display, button, is_press, 0) == 0 {
                             eprintln!("Could not emit Xtest fake motion event");
                             return Err(DeviceOutputError::EmitError(
