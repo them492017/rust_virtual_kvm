@@ -1,24 +1,14 @@
-use crate::mapper::error::EventMappingError;
+use crate::{mapper::error::EventMappingError, Button};
 
 impl From<crate::InputEvent> for evdev::InputEvent {
     fn from(value: crate::InputEvent) -> Self {
         match value {
-            crate::InputEvent::Keyboard(event) => match event {
-                crate::KeyboardEvent::KeyPressed(key) => evdev::InputEvent::new(
+            crate::InputEvent::Keyboard(event) => {
+                evdev::InputEvent::new(
                     evdev::EventType::KEY,
-                    evdev::Key::from(key).code(),
-                    to_evdev_value(event),
-                ),
-                crate::KeyboardEvent::KeyReleased(key) => evdev::InputEvent::new(
-                    evdev::EventType::KEY,
-                    evdev::Key::from(key).code(),
-                    to_evdev_value(event),
-                ),
-                crate::KeyboardEvent::KeyHeld(key) => evdev::InputEvent::new(
-                    evdev::EventType::KEY,
-                    evdev::Key::from(key).code(),
-                    to_evdev_value(event),
-                ),
+                    evdev::Key::from(event.key).code(),
+                    to_evdev_value(event.event_type),
+                )
             },
             crate::InputEvent::Mouse(event) => match event {
                 crate::MouseEvent::Motion { axis, diff } => match axis {
@@ -37,17 +27,17 @@ impl From<crate::InputEvent> for evdev::InputEvent {
                     crate::KeyboardEventType::KeyPressed => evdev::InputEvent::new(
                         evdev::EventType::KEY,
                         evdev::Key::from(button).code(),
-                        to_evdev_value1(event_type),
+                        to_evdev_value(event_type),
                     ),
                     crate::KeyboardEventType::KeyReleased => evdev::InputEvent::new(
                         evdev::EventType::KEY,
                         evdev::Key::from(button).code(),
-                        to_evdev_value1(event_type),
+                        to_evdev_value(event_type),
                     ),
                     crate::KeyboardEventType::KeyHeld => evdev::InputEvent::new(
                         evdev::EventType::KEY,
                         evdev::Key::from(button).code(),
-                        to_evdev_value1(event_type),
+                        to_evdev_value(event_type),
                     ),
                 },
                 crate::MouseEvent::Scroll { axis, diff } => {
@@ -64,31 +54,50 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
     fn try_from(value: evdev::InputEvent) -> Result<Self, Self::Error> {
         match value.event_type() {
             evdev::EventType::KEY => {
-                let key = evdev::Key::new(value.code()).try_into()?;
-                // TODO: button events should be mapped to a MouseEvent
-                Ok(crate::InputEvent::Keyboard(match value.value() {
-                    0 => crate::KeyboardEvent::KeyReleased(key),
-                    1 => crate::KeyboardEvent::KeyPressed(key),
-                    2 => crate::KeyboardEvent::KeyHeld(key),
+                // TODO: rework the type so it is consistent
+                let event_type = match value.value() {
+                    0 => crate::KeyboardEventType::KeyReleased,
+                    1 => crate::KeyboardEventType::KeyPressed,
+                    2 => crate::KeyboardEventType::KeyHeld,
                     _ => {
                         eprintln!("Invalid key event type value: {value:?}");
                         return Err(EventMappingError::InvalidEvent);
                     }
+                };
+                if let Ok(button) = std::convert::TryInto::<Button>::try_into(evdev::Key::new(value.code())) {
+                    return Ok(crate::InputEvent::Mouse(crate::MouseEvent::Button {
+                        event_type,
+                        button,
+                    }))
+                }
+                let key: crate::Key = evdev::Key::new(value.code()).try_into()?;
+                Ok(crate::InputEvent::Keyboard(crate::KeyboardEvent {
+                    event_type,
+                    key,
                 }))
             }
             evdev::EventType::RELATIVE => {
-                let axis = if value.code() == evdev::RelativeAxisType::REL_X.0 {
-                    crate::PointerAxis::Horizontal
+                let (axis, is_motion) = if value.code() == evdev::RelativeAxisType::REL_X.0 {
+                    (crate::PointerAxis::Horizontal, true)
                 } else if value.code() == evdev::RelativeAxisType::REL_Y.0 {
-                    crate::PointerAxis::Vertical
+                    (crate::PointerAxis::Vertical, true)
+                } else if value.code() == evdev::RelativeAxisType::REL_WHEEL.0 {
+                    (crate::PointerAxis::Horizontal, false)
                 } else {
                     eprintln!("Invalid relative event axis value: {value:?}");
                     return Err(EventMappingError::InvalidEvent);
                 };
-                Ok(crate::InputEvent::Mouse(crate::MouseEvent::Motion {
-                    axis,
-                    diff: value.value(),
-                }))
+                if is_motion {
+                    Ok(crate::InputEvent::Mouse(crate::MouseEvent::Motion {
+                        axis,
+                        diff: value.value(),
+                    }))
+                } else {
+                    Ok(crate::InputEvent::Mouse(crate::MouseEvent::Scroll {
+                        axis,
+                        diff: value.value(),
+                    }))
+                }
             }
             _ => {
                 eprintln!("Unsupported event type: {value:?}");
@@ -98,16 +107,7 @@ impl TryFrom<evdev::InputEvent> for crate::InputEvent {
     }
 }
 
-// TODO: refactor this
-fn to_evdev_value(event: crate::KeyboardEvent) -> i32 {
-    match event {
-        crate::KeyboardEvent::KeyPressed(_) => 1,
-        crate::KeyboardEvent::KeyReleased(_) => 0,
-        crate::KeyboardEvent::KeyHeld(_) => 2,
-    }
-}
-
-fn to_evdev_value1(event: crate::KeyboardEventType) -> i32 {
+fn to_evdev_value(event: crate::KeyboardEventType) -> i32 {
     match event {
         crate::KeyboardEventType::KeyPressed => 1,
         crate::KeyboardEventType::KeyReleased => 0,

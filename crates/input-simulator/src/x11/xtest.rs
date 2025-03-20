@@ -55,9 +55,10 @@ impl VirtualDevice for X11VirtualDevice {
 
     fn release_all(&mut self) -> Result<(), DeviceOutputError> {
         let display = self.display.lock().unwrap();
+        let event_type = KeyboardEventType::KeyReleased;
         Key::iter()
             .try_for_each(|key| {
-                let event = InputEvent::Keyboard(KeyboardEvent::KeyReleased(key));
+                let event = InputEvent::Keyboard(KeyboardEvent { event_type, key });
                 unsafe { emit(*display, event) }
             })
             .and(unsafe { flush(*display) })
@@ -67,12 +68,17 @@ impl VirtualDevice for X11VirtualDevice {
 unsafe fn emit(display: *mut Display, event: InputEvent) -> Result<(), DeviceOutputError> {
     match event {
         InputEvent::Keyboard(event) => {
-            let (key, is_press) = match event {
-                KeyboardEvent::KeyPressed(key) | KeyboardEvent::KeyHeld(key) => (key, 1),
-                KeyboardEvent::KeyReleased(key) => (key, 0),
+            let is_press = match event.event_type {
+                KeyboardEventType::KeyPressed | KeyboardEventType::KeyHeld => 1,
+                KeyboardEventType::KeyReleased => 0,
             };
             unsafe {
-                if XTestFakeKeyEvent(display, key.to_x11_keycode(display)?.into(), is_press, 0) == 0
+                if XTestFakeKeyEvent(
+                    display,
+                    event.key.to_x11_keycode(display)?.into(),
+                    is_press,
+                    0,
+                ) == 0
                 {
                     eprintln!("Could not emit Xtest fake key event");
                     return Err(DeviceOutputError::EmitError(

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
@@ -9,11 +11,16 @@ pub enum InputEvent {
     Mouse(MouseEvent),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
-pub enum KeyboardEvent {
-    KeyPressed(Key),
-    KeyReleased(Key),
-    KeyHeld(Key),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeyboardEvent {
+    pub event_type: KeyboardEventType,
+    pub key: Key,
+}
+
+impl fmt::Display for KeyboardEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.event_type, self.key)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
