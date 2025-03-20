@@ -26,7 +26,6 @@ impl ServerResource {
             let client_sender_clone = client_sender.clone();
             let client_message_sender_clone = client_message_sender.clone();
             let cancellation_token_clone1 = cancellation_token.clone();
-            let cancellation_token_clone2 = cancellation_token.clone();
 
             tokio::spawn(async move {
                 let result: Result<(), ClientHandlerError> = async {
@@ -43,7 +42,7 @@ impl ServerResource {
 
                 if let Err(err) = result {
                     eprintln!("Error processing client events: {}", err);
-                    cancellation_token_clone2.cancel();
+                    // Server should ignore the processing error
                 }
             });
         }
